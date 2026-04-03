@@ -38,6 +38,11 @@ var taskFilesCmd = &cobra.Command{
 			}
 		}
 
+		if len(fileBlocks) == 0 {
+			fmt.Println("No files attached.")
+			return nil
+		}
+
 		printStructured(cmd, fileBlocks, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 			fmt.Fprintln(w, "TYPE\tFILE_ID\tTITLE")

@@ -22,6 +22,11 @@ var boardsCmd = &cobra.Command{
 			return fmt.Errorf("listing boards: %w", err)
 		}
 
+		if len(boardList) == 0 {
+			fmt.Println("No boards found.")
+			return nil
+		}
+
 		printStructured(cmd, boardList, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 			fmt.Fprintln(w, "ID\tTITLE\tTYPE")
