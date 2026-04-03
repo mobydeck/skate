@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"go.yaml.in/yaml/v3"
+	"skate/internal/config"
 )
 
 type UserCache struct {
@@ -19,8 +20,7 @@ type UserCache struct {
 }
 
 func NewUserCache(svc *Service) *UserCache {
-	home, _ := os.UserHomeDir()
-	cacheDir := filepath.Join(home, ".cache", "skate")
+	cacheDir := config.CacheDir()
 	os.MkdirAll(cacheDir, 0o755)
 
 	uc := &UserCache{

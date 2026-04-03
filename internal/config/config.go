@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -34,8 +35,21 @@ type Config struct {
 }
 
 func GlobalConfigPath() string {
+	configDir, err := os.UserConfigDir()
+	if err == nil && runtime.GOOS == "windows" {
+		return filepath.Join(configDir, "skate", "skate.yaml")
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "skate.yaml")
+}
+
+func CacheDir() string {
+	cacheDir, err := os.UserCacheDir()
+	if err == nil && runtime.GOOS == "windows" {
+		return filepath.Join(cacheDir, "skate")
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".cache", "skate")
 }
 
 func LoadGlobal() (*Config, error) {
