@@ -156,6 +156,29 @@ func (s *Service) CreateBlock(boardID string, blocks []*Block) ([]*Block, error)
 	return created, nil
 }
 
+// CreateContentBlock creates a block and appends it to the card's contentOrder
+// so it appears in the frontend. Comments don't need this -- only content blocks
+// (text, h1-h3, divider, checkbox, image).
+func (s *Service) CreateContentBlock(boardID, cardID string, block *Block) (*Block, error) {
+	created, err := s.CreateBlock(boardID, []*Block{block})
+	if err != nil {
+		return nil, err
+	}
+	if len(created) == 0 {
+		return nil, fmt.Errorf("no block returned")
+	}
+
+	// Update card's contentOrder to include the new block
+	card, err := s.GetCard(cardID)
+	if err != nil {
+		return created[0], nil // block created but contentOrder not updated
+	}
+	newOrder := append(card.ContentOrder, created[0].ID)
+	s.PatchCard(cardID, &CardPatch{ContentOrder: newOrder})
+
+	return created[0], nil
+}
+
 func (s *Service) UploadFile(teamID, boardID, filePath string) (string, error) {
 	data, err := s.client.Upload("/teams/"+teamID+"/"+boardID+"/files", filePath)
 	if err != nil {

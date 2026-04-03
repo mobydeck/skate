@@ -88,7 +88,7 @@ var createCmd = &cobra.Command{
 				CreateAt: now,
 				UpdateAt: now,
 			}
-			if _, err := svc.CreateBlock(boardID, []*boards.Block{block}); err != nil {
+			if _, err := svc.CreateContentBlock(boardID, created.ID, block); err != nil {
 				fmt.Printf("Warning: card created but failed to add description: %v\n", err)
 			}
 		}

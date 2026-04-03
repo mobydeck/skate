@@ -260,7 +260,7 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 
 		if desc := getStr(input, "description"); desc != "" {
 			block := &boards.Block{ParentID: created.ID, BoardID: boardID, Type: "text", Title: desc, CreateAt: now, UpdateAt: now}
-			svc.CreateBlock(boardID, []*boards.Block{block})
+			svc.CreateContentBlock(boardID, created.ID, block)
 		}
 
 		return textResult(fmt.Sprintf("Created: %s (ID: %s)", created.Title, created.ID)), nil, nil
@@ -343,7 +343,7 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 				CreateAt: now,
 				UpdateAt: now,
 			}
-			if _, err := svc.CreateBlock(card.BoardID, []*boards.Block{block}); err != nil {
+			if _, err := svc.CreateContentBlock(card.BoardID, cardID, block); err != nil {
 				return errResult(err), nil, nil
 			}
 			return textResult(fmt.Sprintf("Image content block added (fileId: %s).", fileID)), nil, nil
@@ -353,9 +353,23 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 			return errResult(fmt.Errorf("text is required for %s blocks", blockType)), nil, nil
 		}
 
+		// Convert heading types to text blocks with markdown prefix
+		actualType := blockType
+		switch blockType {
+		case "h1":
+			actualType = "text"
+			text = "# " + text
+		case "h2":
+			actualType = "text"
+			text = "## " + text
+		case "h3":
+			actualType = "text"
+			text = "### " + text
+		}
+
 		now := time.Now().UnixMilli()
-		block := &boards.Block{ParentID: cardID, BoardID: card.BoardID, Type: blockType, Title: text, CreateAt: now, UpdateAt: now}
-		if _, err := svc.CreateBlock(card.BoardID, []*boards.Block{block}); err != nil {
+		block := &boards.Block{ParentID: cardID, BoardID: card.BoardID, Type: actualType, Title: text, CreateAt: now, UpdateAt: now}
+		if _, err := svc.CreateContentBlock(card.BoardID, cardID, block); err != nil {
 			return errResult(err), nil, nil
 		}
 		return textResult(fmt.Sprintf("Content block added (%s).", blockType)), nil, nil

@@ -54,6 +54,20 @@ var addContentCmd = &cobra.Command{
 			return fmt.Errorf("text is required for %s blocks", blockType)
 		}
 
+		// Convert heading types to text blocks with markdown prefix
+		actualType := blockType
+		switch blockType {
+		case "h1":
+			actualType = "text"
+			text = "# " + text
+		case "h2":
+			actualType = "text"
+			text = "## " + text
+		case "h3":
+			actualType = "text"
+			text = "### " + text
+		}
+
 		_ = cfg
 		card, err := svc.GetCard(cardID)
 		if err != nil {
@@ -64,13 +78,13 @@ var addContentCmd = &cobra.Command{
 		block := &boards.Block{
 			ParentID: cardID,
 			BoardID:  card.BoardID,
-			Type:     blockType,
+			Type:     actualType,
 			Title:    text,
 			CreateAt: now,
 			UpdateAt: now,
 		}
 
-		_, err = svc.CreateBlock(card.BoardID, []*boards.Block{block})
+		_, err = svc.CreateContentBlock(card.BoardID, cardID, block)
 		if err != nil {
 			return fmt.Errorf("adding content block: %w", err)
 		}
@@ -102,7 +116,7 @@ func addImageBlock(cfg *config.Config, svc *boards.Service, cardID, filePath str
 		UpdateAt: now,
 	}
 
-	_, err = svc.CreateBlock(card.BoardID, []*boards.Block{block})
+	_, err = svc.CreateContentBlock(card.BoardID, cardID, block)
 	if err != nil {
 		return fmt.Errorf("adding image block: %w", err)
 	}
