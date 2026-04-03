@@ -9,6 +9,8 @@ import (
 	"skate/internal/translate"
 )
 
+const defaultMaxComments = 5
+
 var taskCmd = &cobra.Command{
 	Use:   "task <TASK_ID>",
 	Short: "View task details in markdown",
@@ -48,10 +50,23 @@ var taskCmd = &cobra.Command{
 		}, func() {
 			uc := boards.NewUserCache(svc)
 			defer uc.Flush()
-			tr := translate.New(cfg.Translate)
-			md := boards.RenderCardMarkdown(card, board, blocks, summaries, uc, tr)
+			var tr *translate.Translator
+			if noTr, _ := cmd.Flags().GetBool("no-translate"); !noTr {
+				tr = translate.New(cfg.Translate)
+			}
+			full, _ := cmd.Flags().GetBool("full")
+			limit := defaultMaxComments
+			if full {
+				limit = 0
+			}
+			md := boards.RenderCardMarkdown(card, board, blocks, summaries, uc, tr, limit)
 			fmt.Print(md)
 		})
 		return nil
 	},
+}
+
+func init() {
+	taskCmd.Flags().BoolP("no-translate", "T", false, "Skip translation even if enabled in config")
+	taskCmd.Flags().Bool("full", false, "Show all comments (default: last 5)")
 }

@@ -108,8 +108,11 @@ skate tasks --board <BOARD_ID>        # Specific board
 skate tasks --mine                    # Only tasks assigned to you
 skate tasks --all-users               # All users (overrides only_mine config)
 skate tasks --json                    # JSON output
-skate task <TASK_ID>                  # View full task details (markdown)
+skate task <TASK_ID>                  # View task details (last 5 comments)
+skate task <TASK_ID> --full           # View task with all comments
+skate task <TASK_ID> -T               # View task without translation
 skate task <TASK_ID> --json           # Full task data as JSON
+skate comments <TASK_ID>              # View all comments for a task
 skate task-files <TASK_ID>            # List attached files
 skate download <BOARD_ID> <FILE_ID>   # Download a file
 ```
@@ -187,7 +190,7 @@ When connected via MCP, AI agents can use these tools:
 |------|-------------|
 | `skate_boards` | List available boards |
 | `skate_tasks` | List tasks (default: active only, use `show_all` for all) |
-| `skate_task` | Get full task details as markdown |
+| `skate_task` | Get task details as markdown (all comments shown via MCP) |
 | `skate_update_status` | Change task status |
 | `skate_create_task` | Create a new task |
 | `skate_comment` | Add a comment to a task |

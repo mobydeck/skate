@@ -9,7 +9,7 @@ default:
 
 # Build for current platform
 build:
-    go build -trimpath -ldflags '{{ldflags}}' -o skate ./cmd/skate
+    go build -trimpath -ldflags '{{ ldflags }}' -o skate ./cmd/skate
 
 # Run tests
 test:
@@ -24,31 +24,30 @@ install: build
 cross-build: clean
     #!/usr/bin/env bash
     set -euo pipefail
-    mkdir -p {{dist}}
+    mkdir -p {{ dist }}
     platforms=(
         "linux/amd64"
         "linux/arm64"
-        "darwin/amd64"
         "darwin/arm64"
         "windows/amd64"
     )
     for platform in "${platforms[@]}"; do
         IFS='/' read -r goos goarch <<< "$platform"
-        output="{{dist}}/skate-${goos}-${goarch}"
+        output="{{ dist }}/skate-${goos}-${goarch}"
         if [ "$goos" = "windows" ]; then
             output="${output}.exe"
         fi
         echo "Building ${goos}/${goarch}..."
-        GOOS=$goos GOARCH=$goarch go build -trimpath -ldflags '{{ldflags}}' -o "$output" ./cmd/skate
+        GOOS=$goos GOARCH=$goarch go build -trimpath -ldflags '{{ ldflags }}' -o "$output" ./cmd/skate
     done
-    echo "Done. Binaries in {{dist}}/"
-    ls -lh {{dist}}/
+    echo "Done. Binaries in {{ dist }}/"
+    ls -lh {{ dist }}/
 
 # Create checksums for dist binaries
 checksums:
     #!/usr/bin/env bash
     set -euo pipefail
-    cd {{dist}}
+    cd {{ dist }}
     sha256sum skate-* > checksums.txt
     cat checksums.txt
 
@@ -56,7 +55,7 @@ checksums:
 release: cross-build checksums
     #!/usr/bin/env bash
     set -euo pipefail
-    tag="{{version}}"
+    tag="{{ version }}"
     if [ "$tag" = "dev" ] || echo "$tag" | grep -q dirty; then
         echo "Error: cannot release from dev or dirty state. Tag a version first."
         exit 1
@@ -80,14 +79,14 @@ release: cross-build checksums
         --draft \
         --title "Skate ${tag}" \
         --generate-notes \
-        {{dist}}/skate-* \
-        {{dist}}/checksums.txt
+        {{ dist }}/skate-* \
+        {{ dist }}/checksums.txt
 
     echo "Draft release created: ${tag}"
 
 # Clean build artifacts
 clean:
-    rm -rf skate {{dist}}
+    rm -rf skate {{ dist }}
 
 # Lint
 lint:

@@ -10,7 +10,8 @@ You have access to project tasks on Mattermost Boards via Skate. Use these tools
 ## Before starting work
 
 1. List available tasks: `skate tasks` or use `skate_tasks` tool
-2. Review task details before working: `skate task <ID>` or `skate_task`
+2. Review task details before working: `skate task <ID>` or `skate_task` (shows last 5 comments; use `--full` for all)
+   - To see all comments only: `skate comments <ID>`
 3. Update status to "In Progress": `skate update-status <ID> "In Progress"` or `skate_update_status`
 4. Start time tracking: `skate timer-start <ID>` or `skate_timer_start`
 
@@ -30,7 +31,7 @@ You have access to project tasks on Mattermost Boards via Skate. Use these tools
 
 Tasks you previously completed may reappear as "Not Started" or "In Progress". This can mean:
 
-1. **New feedback**: The user reopened the task with new comments explaining what needs to change. Read ALL comments to understand what's needed.
+1. **New feedback**: The user reopened the task with new comments explaining what needs to change. Use `skate comments <ID>` or `skate task <ID> --full` to read ALL comments.
 2. **Repetitive task**: Some tasks are recurring by nature (e.g., "Update docs", "Run tests", "Update README"). The user wants you to execute the task again with fresh context — even if there are no new comments. Check the current state of the relevant files and act accordingly.
 
 In both cases: update status, start timer, do the work, then complete again.

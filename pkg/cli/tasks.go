@@ -108,8 +108,9 @@ var tasksCmd = &cobra.Command{
 			fmt.Fprintln(w, "ID\tTITLE\tSTATUS\tPRIORITY\tASSIGNEE")
 			for _, rc := range resolved {
 				title := rc.Title
-				if len(title) > 50 {
-					title = title[:47] + "..."
+				runes := []rune(title)
+				if len(runes) > 50 {
+					title = string(runes[:47]) + "..."
 				}
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 					rc.ID, title, rc.Status, rc.Priority, rc.Assignee)

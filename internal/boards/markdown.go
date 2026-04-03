@@ -2,6 +2,7 @@ package boards
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -11,7 +12,7 @@ type TextTranslator interface {
 	Translate(text string) string
 }
 
-func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*TimeEntrySummary, uc *UserCache, tr TextTranslator) string {
+func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*TimeEntrySummary, uc *UserCache, tr TextTranslator, maxComments ...int) string {
 	defs := ParsePropertyDefs(board)
 	var sb strings.Builder
 
@@ -78,9 +79,28 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 		}
 	}
 
+	sort.Slice(comments, func(i, j int) bool {
+		return comments[i].CreateAt < comments[j].CreateAt
+	})
+
 	if len(comments) > 0 {
+		limit := 0
+		if len(maxComments) > 0 && maxComments[0] > 0 {
+			limit = maxComments[0]
+		}
+
+		shown := comments
+		hidden := 0
+		if limit > 0 && len(comments) > limit {
+			hidden = len(comments) - limit
+			shown = comments[hidden:] // show last N (most recent)
+		}
+
 		sb.WriteString("## Comments\n\n")
-		for _, c := range comments {
+		if hidden > 0 {
+			sb.WriteString(fmt.Sprintf("*(%d earlier comments not shown, use --full to see all)*\n\n", hidden))
+		}
+		for _, c := range shown {
 			date := FormatTimestamp(c.CreateAt)
 			author := c.CreatedBy
 			if uc != nil {
@@ -127,6 +147,34 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 		sb.WriteString(fmt.Sprintf("\nTotal: %s\n", FormatDuration(totalSeconds)))
 	}
 
+	return sb.String()
+}
+
+func RenderComments(blocks []*Block, uc *UserCache, tr TextTranslator) string {
+	var comments []*Block
+	for _, b := range blocks {
+		if b.Type == "comment" {
+			comments = append(comments, b)
+		}
+	}
+
+	if len(comments) == 0 {
+		return "No comments.\n"
+	}
+
+	sort.Slice(comments, func(i, j int) bool {
+		return comments[i].CreateAt < comments[j].CreateAt
+	})
+
+	var sb strings.Builder
+	for _, c := range comments {
+		date := FormatTimestamp(c.CreateAt)
+		author := c.CreatedBy
+		if uc != nil {
+			author = uc.Resolve(c.CreatedBy)
+		}
+		sb.WriteString(fmt.Sprintf("**@%s** (%s):\n> %s\n\n", author, date, tl(tr, c.Title)))
+	}
 	return sb.String()
 }
 

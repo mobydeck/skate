@@ -3,6 +3,7 @@ package translate
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 	"unicode"
@@ -74,11 +75,10 @@ func (t *Translator) Translate(text string) string {
 			openai.SystemMessage(systemPrompt),
 			openai.UserMessage(text),
 		},
-		Temperature: openai.Float(0.1),
-		MaxTokens:   openai.Int(4096),
+		MaxCompletionTokens: openai.Int(4096),
 	})
 	if err != nil {
-		// On error, return original text
+		fmt.Fprintf(os.Stderr, "translate: %v\n", err)
 		return text
 	}
 
