@@ -8,18 +8,23 @@ import (
 )
 
 var downloadCmd = &cobra.Command{
-	Use:   "download <BOARD_ID> <FILE_ID>",
+	Use:   "download <FILE_ID>",
 	Short: "Download a file from a board",
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, svc, err := loadConfigAndService()
 		if err != nil {
 			return err
 		}
 
-		boardID := args[0]
-		fileID := args[1]
+		fileID := args[0]
 		output, _ := cmd.Flags().GetString("output")
+		flagBoard, _ := cmd.Flags().GetString("board")
+
+		boardID, err := requireBoardID(cfg, flagBoard)
+		if err != nil {
+			return err
+		}
 
 		data, err := svc.DownloadFile(cfg.TeamID, boardID, fileID)
 		if err != nil {
@@ -40,4 +45,5 @@ var downloadCmd = &cobra.Command{
 
 func init() {
 	downloadCmd.Flags().StringP("output", "o", "", "Output file path (default: stdout)")
+	downloadCmd.Flags().StringP("board", "b", "", "Board ID (default from .skate.yaml)")
 }

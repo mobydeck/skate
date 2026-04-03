@@ -114,7 +114,8 @@ skate task <TASK_ID> -T               # View task without translation
 skate task <TASK_ID> --json           # Full task data as JSON
 skate comments <TASK_ID>              # View all comments for a task
 skate task-files <TASK_ID>            # List attached files
-skate download <BOARD_ID> <FILE_ID>   # Download a file
+skate download <FILE_ID>              # Download a file (board from .skate.yaml)
+skate download <FILE_ID> -b <BOARD>   # Download from specific board
 ```
 
 Task detail renders as markdown:

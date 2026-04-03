@@ -85,8 +85,7 @@ var localInitCmd = &cobra.Command{
 			}
 		}
 
-		localCfg := &config.Config{BoardID: boardID}
-		if err := localCfg.Save(".skate.yaml"); err != nil {
+		if err := config.SaveLocal(".skate.yaml", boardID); err != nil {
 			return fmt.Errorf("saving local config: %w", err)
 		}
 		fmt.Printf("Local config saved to .skate.yaml (board: %s)\n", boardName)

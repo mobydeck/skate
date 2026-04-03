@@ -164,6 +164,19 @@ func applyEnvOverrides(cfg *Config) {
 	}
 }
 
+// LocalConfig represents a per-project .skate.yaml with only the board ID.
+type LocalConfig struct {
+	BoardID string `yaml:"board_id"`
+}
+
+func SaveLocal(path string, boardID string) error {
+	data, err := yaml.Marshal(&LocalConfig{BoardID: boardID})
+	if err != nil {
+		return fmt.Errorf("marshaling local config: %w", err)
+	}
+	return os.WriteFile(path, data, 0o600)
+}
+
 func (c *Config) Validate() error {
 	if c.MattermostURL == "" {
 		return fmt.Errorf("mattermost_url is required (run 'skate init' or set SKATE_URL)")

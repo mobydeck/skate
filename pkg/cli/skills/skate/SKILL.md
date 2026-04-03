@@ -12,20 +12,33 @@ You have access to project tasks on Mattermost Boards via Skate. Use these tools
 1. List available tasks: `skate tasks` or use `skate_tasks` tool
 2. Review task details before working: `skate task <ID>` or `skate_task` (shows last 5 comments; use `--full` for all)
    - To see all comments only: `skate comments <ID>`
-3. Update status to "In Progress": `skate update-status <ID> "In Progress"` or `skate_update_status`
-4. Start time tracking: `skate timer-start <ID>` or `skate_timer_start`
+3. **Check for attached files**: use `skate task-files <ID>` to list attachments. If the task has images, text, markdown, config files, or other readable files — download and review them before starting. They often contain essential context, screenshots of bugs, or reference material.
+   - Download: `skate download <FILE_ID> -o filename.ext`
+4. Update status to "In Progress": `skate update-status <ID> "In Progress"` or `skate_update_status`
+5. Start time tracking: `skate timer-start <ID>` or `skate_timer_start`
 
 ## While working
 
 - Add progress comments: `skate comment <ID> "Implemented feature X"` or `skate_comment`
 - Create sub-tasks if needed: `skate create "Sub-task title"` or `skate_create_task`
-- Attach files when relevant: `skate attach <ID> <file>`
+- **Attach files** to preserve context: `skate attach <ID> <file>`. Use this for test output, logs, generated configs, screenshots, or any artifact that helps the team (or future agents) understand what happened. Attachments are especially valuable for large outputs that would clutter a comment.
 
 ## After finishing work
 
 1. Stop timer with notes: `skate timer-stop --notes "Completed implementation"` or `skate_timer_stop`
 2. Update status: `skate update-status <ID> "Done"` or `skate_update_status`
 3. Add final summary comment with what was done
+
+## When to block a task
+
+If a task involves major changes, ambiguous requirements, or missing information — do not guess. Instead:
+
+1. Add a comment explaining what you need: a decision, clarification, data, or user feedback
+2. Attach any relevant files that show the current state or the problem
+3. Update status to "Blocked": `skate update-status <ID> "Blocked"`
+4. Stop the timer: `skate timer-stop --notes "Blocked: waiting for ..."`
+
+The user will review, respond, and reopen the task when ready. This is better than making the wrong assumption and having to redo the work.
 
 ## Reopened / follow-up tasks
 
