@@ -49,6 +49,7 @@ func init() {
 	rootCmd.AddCommand(setupCmd)
 	rootCmd.AddCommand(promptCmd)
 	rootCmd.AddCommand(commentsCmd)
+	rootCmd.AddCommand(configCmd)
 }
 
 func loadConfigAndService() (*config.Config, *boards.Service, error) {

@@ -38,7 +38,7 @@ skate comment <ID> "@arthur Fixed the UTF-8 truncation bug. — claude-code (cla
 ```
 
 **Disabling mentions:**
-Mentions can be disabled per project via config (`mentions: false` in `.skate.yaml`). If mentions are disabled, skip the `@username` prefix entirely.
+Mentions can be disabled per project via config (`mentions: false` in `.skate.yaml`). Check with `skate config` to see the effective setting. If mentions are disabled, skip the `@username` prefix entirely.
 
 ## After finishing work
 
