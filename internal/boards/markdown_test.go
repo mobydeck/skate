@@ -103,6 +103,44 @@ func TestRenderCardMarkdown_InlineImage(t *testing.T) {
 	}
 }
 
+func TestRenderCardMarkdown_CreatedBy(t *testing.T) {
+	card := &Card{Title: "Test", CreatedBy: "user-abc"}
+	board := &Board{}
+
+	md := RenderCardMarkdown(card, board, nil, nil, nil, nil)
+
+	if !strings.Contains(md, "| Created By | @user-abc |") {
+		t.Error("should show Created By with @ prefix")
+	}
+}
+
+func TestRenderCardMarkdown_PersonProperty(t *testing.T) {
+	card := &Card{
+		Title: "Test",
+		Properties: map[string]interface{}{
+			"p1": "user-id-1",
+		},
+	}
+	board := &Board{
+		CardProperties: []map[string]interface{}{
+			{
+				"id":   "p1",
+				"name": "Assignee",
+				"type": "person",
+			},
+		},
+	}
+
+	// Without UserCache, person property shows raw ID (no @ prefix, no resolution)
+	md := RenderCardMarkdown(card, board, nil, nil, nil, nil)
+	if !strings.Contains(md, "| Assignee | user-id-1 |") {
+		t.Errorf("should show person property value, got:\n%s", md)
+	}
+	if strings.Contains(md, "@user-id-1") {
+		t.Error("should not add @ prefix without UserCache")
+	}
+}
+
 func TestRenderCardMarkdown_TimeTracking(t *testing.T) {
 	card := &Card{Title: "Test"}
 	board := &Board{}

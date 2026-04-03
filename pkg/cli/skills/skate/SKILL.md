@@ -14,8 +14,9 @@ You have access to project tasks on Mattermost Boards via Skate. Use these tools
    - To see all comments only: `skate comments <ID>`
 3. **Check for attached files**: use `skate task-files <ID>` to list attachments. If the task has images, text, markdown, config files, or other readable files — download and review them before starting. They often contain essential context, screenshots of bugs, or reference material.
    - Download: `skate download <FILE_ID> -o filename.ext`
-4. Update status to "In Progress": `skate update-status <ID> "In Progress"` or `skate_update_status`
-5. Start time tracking: `skate timer-start <ID>` or `skate_timer_start`
+4. **Search for related tasks** if you need context: `skate find "keyword"` or `skate_find` MCP tool. Searches titles first, then content blocks and comments. Useful for finding prior work, related bugs, or duplicate tasks before starting.
+5. Update status to "In Progress": `skate update-status <ID> "In Progress"` or `skate_update_status`
+6. Start time tracking: `skate timer-start <ID>` or `skate_timer_start`
 
 ## While working
 
@@ -113,6 +114,15 @@ Examples:
 - `— cursor (gpt-4o)`
 
 This is for informational purposes only — helps the team understand which AI contributed what.
+
+## Plans (IMPORTANT)
+
+If a task requires planning and you produce a plan, you **MUST** attach it to the task as a markdown file:
+
+- File name: `plan-<short-description>.md` (e.g., `plan-refactor-config.md`)
+- Attach with: `skate attach <ID> plan-<name>.md`
+- If the plan is modified during work, attach each revision
+- **The final version of the plan MUST be attached before completing the task.** This is non-negotiable. The user relies on plan attachments to understand what was decided and why. Missing a final plan attachment is a deal breaker.
 
 ## Rules
 
