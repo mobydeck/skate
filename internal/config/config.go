@@ -105,33 +105,15 @@ func Load() (*Config, error) {
 	if localPath != "" {
 		data, err := os.ReadFile(localPath)
 		if err == nil {
-			var local Config
+			var local LocalConfig
 			if err := yaml.Unmarshal(data, &local); err == nil {
-				mergeLocal(cfg, &local)
+				local.applyTo(cfg)
 			}
 		}
 	}
 
 	applyEnvOverrides(cfg)
 	return cfg, nil
-}
-
-func mergeLocal(global, local *Config) {
-	if local.MattermostURL != "" {
-		global.MattermostURL = local.MattermostURL
-	}
-	if local.Token != "" {
-		global.Token = local.Token
-	}
-	if local.TeamID != "" {
-		global.TeamID = local.TeamID
-	}
-	if local.BoardID != "" {
-		global.BoardID = local.BoardID
-	}
-	if local.OnlyMine {
-		global.OnlyMine = true
-	}
 }
 
 func applyEnvOverrides(cfg *Config) {
@@ -164,9 +146,26 @@ func applyEnvOverrides(cfg *Config) {
 	}
 }
 
-// LocalConfig represents a per-project .skate.yaml with only the board ID.
+// LocalConfig represents a per-project .skate.yaml.
+// All fields use omitempty so only explicitly set values are written.
+// When loaded, non-empty values override the corresponding global config fields.
 type LocalConfig struct {
-	BoardID string `yaml:"board_id"`
+	MattermostURL string               `yaml:"mattermost_url,omitempty"`
+	Token         string               `yaml:"token,omitempty"`
+	TeamID        string               `yaml:"team_id,omitempty"`
+	BoardID       string               `yaml:"board_id,omitempty"`
+	OnlyMine      bool                 `yaml:"only_mine,omitempty"`
+	Translate     *LocalTranslateConfig `yaml:"translate,omitempty"`
+}
+
+// LocalTranslateConfig is the local override for translation settings.
+// Fields use omitempty so only explicitly set values are written.
+type LocalTranslateConfig struct {
+	Enabled  *bool  `yaml:"enabled,omitempty"`
+	Provider string `yaml:"provider,omitempty"`
+	Model    string `yaml:"model,omitempty"`
+	BaseURL  string `yaml:"base_url,omitempty"`
+	APIKey   string `yaml:"api_key,omitempty"`
 }
 
 func SaveLocal(path string, boardID string) error {
@@ -175,6 +174,41 @@ func SaveLocal(path string, boardID string) error {
 		return fmt.Errorf("marshaling local config: %w", err)
 	}
 	return os.WriteFile(path, data, 0o600)
+}
+
+func (lc *LocalConfig) applyTo(cfg *Config) {
+	if lc.MattermostURL != "" {
+		cfg.MattermostURL = lc.MattermostURL
+	}
+	if lc.Token != "" {
+		cfg.Token = lc.Token
+	}
+	if lc.TeamID != "" {
+		cfg.TeamID = lc.TeamID
+	}
+	if lc.BoardID != "" {
+		cfg.BoardID = lc.BoardID
+	}
+	if lc.OnlyMine {
+		cfg.OnlyMine = true
+	}
+	if lc.Translate != nil {
+		if lc.Translate.Enabled != nil {
+			cfg.Translate.Enabled = *lc.Translate.Enabled
+		}
+		if lc.Translate.Provider != "" {
+			cfg.Translate.Provider = lc.Translate.Provider
+		}
+		if lc.Translate.Model != "" {
+			cfg.Translate.Model = lc.Translate.Model
+		}
+		if lc.Translate.BaseURL != "" {
+			cfg.Translate.BaseURL = lc.Translate.BaseURL
+		}
+		if lc.Translate.APIKey != "" {
+			cfg.Translate.APIKey = lc.Translate.APIKey
+		}
+	}
 }
 
 func (c *Config) Validate() error {

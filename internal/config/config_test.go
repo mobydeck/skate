@@ -59,17 +59,17 @@ func TestEnvOverrides(t *testing.T) {
 	}
 }
 
-func TestMergeLocal(t *testing.T) {
+func TestLocalConfig_ApplyTo(t *testing.T) {
 	global := &Config{
 		MattermostURL: "https://global.example.com",
 		Token:         "global-token",
 		TeamID:        "global-team",
 	}
-	local := &Config{
+	local := &LocalConfig{
 		BoardID: "local-board",
 	}
 
-	mergeLocal(global, local)
+	local.applyTo(global)
 
 	if global.MattermostURL != "https://global.example.com" {
 		t.Error("global URL should not change when local is empty")
@@ -79,18 +79,16 @@ func TestMergeLocal(t *testing.T) {
 	}
 }
 
-func TestMergeLocal_EmptyDoesNotOverride(t *testing.T) {
+func TestLocalConfig_EmptyDoesNotOverride(t *testing.T) {
 	global := &Config{
 		MattermostURL: "https://global.example.com",
 		Token:         "global-token",
 	}
-	local := &Config{
-		MattermostURL: "",
-		Token:         "",
-		BoardID:       "board-123",
+	local := &LocalConfig{
+		BoardID: "board-123",
 	}
 
-	mergeLocal(global, local)
+	local.applyTo(global)
 
 	if global.MattermostURL != "https://global.example.com" {
 		t.Error("empty local URL should not override global")
@@ -100,6 +98,87 @@ func TestMergeLocal_EmptyDoesNotOverride(t *testing.T) {
 	}
 	if global.BoardID != "board-123" {
 		t.Error("local BoardID should override")
+	}
+}
+
+func TestLocalConfig_OverridesGlobal(t *testing.T) {
+	global := &Config{
+		MattermostURL: "https://global.example.com",
+		Token:         "global-token",
+		TeamID:        "global-team",
+	}
+	local := &LocalConfig{
+		MattermostURL: "https://local.example.com",
+		TeamID:        "local-team",
+		BoardID:       "local-board",
+	}
+
+	local.applyTo(global)
+
+	if global.MattermostURL != "https://local.example.com" {
+		t.Errorf("local URL should override global, got %q", global.MattermostURL)
+	}
+	if global.Token != "global-token" {
+		t.Error("unset local token should not override global")
+	}
+	if global.TeamID != "local-team" {
+		t.Errorf("local TeamID should override global, got %q", global.TeamID)
+	}
+	if global.BoardID != "local-board" {
+		t.Errorf("local BoardID should override global, got %q", global.BoardID)
+	}
+}
+
+func TestLocalConfig_TranslateOverride(t *testing.T) {
+	global := &Config{
+		MattermostURL: "https://example.com",
+		Translate: TranslateConfig{
+			Enabled:  false,
+			Provider: "openai",
+			Model:    "gpt-5-mini",
+			APIKey:   "global-key",
+		},
+	}
+	enabled := true
+	local := &LocalConfig{
+		Translate: &LocalTranslateConfig{
+			Enabled: &enabled,
+			Model:   "llama3",
+		},
+	}
+
+	local.applyTo(global)
+
+	if !global.Translate.Enabled {
+		t.Error("local should override translate.enabled to true")
+	}
+	if global.Translate.Model != "llama3" {
+		t.Errorf("local should override model, got %q", global.Translate.Model)
+	}
+	if global.Translate.Provider != "openai" {
+		t.Error("unset local provider should not override global")
+	}
+	if global.Translate.APIKey != "global-key" {
+		t.Error("unset local api_key should not override global")
+	}
+}
+
+func TestLocalConfig_NilTranslateDoesNotOverride(t *testing.T) {
+	global := &Config{
+		Translate: TranslateConfig{
+			Enabled:  true,
+			Provider: "openai",
+		},
+	}
+	local := &LocalConfig{BoardID: "board-123"}
+
+	local.applyTo(global)
+
+	if !global.Translate.Enabled {
+		t.Error("nil local translate should not override global")
+	}
+	if global.Translate.Provider != "openai" {
+		t.Error("nil local translate should not override global provider")
 	}
 }
 
