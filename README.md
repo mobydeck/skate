@@ -59,6 +59,18 @@ This registers the MCP server and installs a skill file that teaches the agent h
 
 Use `--project` / `-p` flag to install for the current project only (writes to `.mcp.json` instead of global config).
 
+### 4. Bootstrap an AI agent session
+
+If an agent doesn't auto-discover MCP or skills, paste the output of `skate prompt` into the chat:
+
+```bash
+skate prompt claude-code   # or: cursor, codex
+```
+
+```
+Before starting work, read and follow rules in /home/user/.claude/skills/skate/SKILL.md
+```
+
 ## CLI Commands
 
 ### Boards
@@ -221,9 +233,9 @@ Translation uses a fast heuristic to detect non-English text and only calls the 
 
 ## Config Files
 
-- **Global:** `~/.config/skate.yaml`
+- **Global:** `~/.config/skate.yaml` (Linux), `%AppData%\skate\skate.yaml` (Windows)
 - **Local:** `.skate.yaml` (per project, walks up directories)
-- **User cache:** `~/.cache/skate/users.yaml` (auto-populated)
+- **User cache:** `~/.cache/skate/users.yaml` (Linux), `%LocalAppData%\skate\users.yaml` (Windows)
 
 ```yaml
 # ~/.config/skate.yaml
@@ -281,9 +293,9 @@ VERSION=1.0.0 make build   # explicit version
 
 - **Pure Go** — single static binary, no runtime dependencies, cross-compilable to 5 platforms
 - **Stateless** — no local database, all data lives in Mattermost
-- **User cache** — resolved usernames cached in `~/.cache/skate/users.yaml`
+- **User cache** — resolved usernames cached in `~/.cache/skate/users.yaml` (Linux) or `%LocalAppData%\skate\` (Windows)
 - **MCP stdio** — agents start skate on demand, zero idle cost
-- **Config merging** — global `~/.config/skate.yaml` + local `.skate.yaml` + env vars (env wins)
+- **Config merging** — global config + local `.skate.yaml` + env vars (env wins)
 - **Version** — set via ldflags, shared across CLI, HTTP client User-Agent, and MCP server
 
 ## License

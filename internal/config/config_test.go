@@ -179,6 +179,28 @@ func TestFindLocalConfig(t *testing.T) {
 	}
 }
 
+func TestGlobalConfigPath_Linux(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	got := GlobalConfigPath()
+	want := filepath.Join(home, ".config", "skate.yaml")
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestCacheDir_Linux(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	got := CacheDir()
+	want := filepath.Join(home, ".cache", "skate")
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && filepath.Base(s) != "" && // just use strings
 		stringContains(s, substr)
