@@ -31,7 +31,16 @@ type Config struct {
 	TeamID        string          `yaml:"team_id,omitempty"`
 	BoardID       string          `yaml:"board_id,omitempty"`
 	OnlyMine      bool            `yaml:"only_mine,omitempty"`
+	Mentions      *bool           `yaml:"mentions,omitempty"`
 	Translate     TranslateConfig `yaml:"translate"`
+}
+
+// MentionsEnabled returns whether @mentions are enabled (default: true).
+func (c *Config) MentionsEnabled() bool {
+	if c.Mentions == nil {
+		return true
+	}
+	return *c.Mentions
 }
 
 func GlobalConfigPath() string {
@@ -150,11 +159,12 @@ func applyEnvOverrides(cfg *Config) {
 // All fields use omitempty so only explicitly set values are written.
 // When loaded, non-empty values override the corresponding global config fields.
 type LocalConfig struct {
-	MattermostURL string               `yaml:"mattermost_url,omitempty"`
-	Token         string               `yaml:"token,omitempty"`
-	TeamID        string               `yaml:"team_id,omitempty"`
-	BoardID       string               `yaml:"board_id,omitempty"`
-	OnlyMine      bool                 `yaml:"only_mine,omitempty"`
+	MattermostURL string                `yaml:"mattermost_url,omitempty"`
+	Token         string                `yaml:"token,omitempty"`
+	TeamID        string                `yaml:"team_id,omitempty"`
+	BoardID       string                `yaml:"board_id,omitempty"`
+	OnlyMine      bool                  `yaml:"only_mine,omitempty"`
+	Mentions      *bool                 `yaml:"mentions,omitempty"`
 	Translate     *LocalTranslateConfig `yaml:"translate,omitempty"`
 }
 
@@ -191,6 +201,9 @@ func (lc *LocalConfig) applyTo(cfg *Config) {
 	}
 	if lc.OnlyMine {
 		cfg.OnlyMine = true
+	}
+	if lc.Mentions != nil {
+		cfg.Mentions = lc.Mentions
 	}
 	if lc.Translate != nil {
 		if lc.Translate.Enabled != nil {

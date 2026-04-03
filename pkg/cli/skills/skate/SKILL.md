@@ -23,6 +23,23 @@ You have access to project tasks on Mattermost Boards via Skate. Use these tools
 - Create sub-tasks if needed: `skate create "Sub-task title"` or `skate_create_task`
 - **Attach files** to preserve context: `skate attach <ID> <file>`. Use this for test output, logs, generated configs, screenshots, or any artifact that helps the team (or future agents) understand what happened. Attachments are especially valuable for large outputs that would clutter a comment.
 
+## Mentions in comments
+
+By default, mention the last relevant person when adding comments — this notifies them in Mattermost. Use `@username` at the start of your comment text.
+
+**Who to mention:**
+- If no comments exist yet: mention the **task creator** (shown in task detail output)
+- If comments exist: mention the **last commenter** (the most recent comment author)
+- Only mention **one person** — the last relevant one, not everyone
+
+**Example:**
+```
+skate comment <ID> "@arthur Fixed the UTF-8 truncation bug. — claude-code (claude-opus-4-6)"
+```
+
+**Disabling mentions:**
+Mentions can be disabled per project via config (`mentions: false` in `.skate.yaml`). If mentions are disabled, skip the `@username` prefix entirely.
+
 ## After finishing work
 
 1. Stop timer with notes: `skate timer-stop --notes "Completed implementation"` or `skate_timer_stop`

@@ -182,6 +182,31 @@ func TestLocalConfig_NilTranslateDoesNotOverride(t *testing.T) {
 	}
 }
 
+func TestMentionsEnabled_Default(t *testing.T) {
+	cfg := &Config{}
+	if !cfg.MentionsEnabled() {
+		t.Error("mentions should default to true when nil")
+	}
+}
+
+func TestMentionsEnabled_ExplicitFalse(t *testing.T) {
+	f := false
+	cfg := &Config{Mentions: &f}
+	if cfg.MentionsEnabled() {
+		t.Error("mentions should be false when explicitly set")
+	}
+}
+
+func TestLocalConfig_MentionsOverride(t *testing.T) {
+	global := &Config{}
+	f := false
+	local := &LocalConfig{Mentions: &f}
+	local.applyTo(global)
+	if global.MentionsEnabled() {
+		t.Error("local mentions=false should override default true")
+	}
+}
+
 func TestValidate(t *testing.T) {
 	cfg := &Config{}
 	if err := cfg.Validate(); err == nil {
