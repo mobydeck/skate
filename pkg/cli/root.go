@@ -41,6 +41,7 @@ func init() {
 	rootCmd.AddCommand(updateStatusCmd)
 	rootCmd.AddCommand(createCmd)
 	rootCmd.AddCommand(commentCmd)
+	rootCmd.AddCommand(addContentCmd)
 	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(timerStartCmd)
 	rootCmd.AddCommand(timerStopCmd)

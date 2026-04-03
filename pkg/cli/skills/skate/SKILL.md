@@ -23,6 +23,39 @@ You have access to project tasks on Mattermost Boards via Skate. Use these tools
 - Create sub-tasks if needed: `skate create "Sub-task title"` or `skate_create_task`
 - **Attach files** to preserve context: `skate attach <ID> <file>`. Use this for test output, logs, generated configs, screenshots, or any artifact that helps the team (or future agents) understand what happened. Attachments are especially valuable for large outputs that would clutter a comment.
 
+## Content blocks vs comments
+
+Tasks have two types of text: **content blocks** (the Description section) and **comments**.
+
+**Comments** are for work summaries, progress updates, and communication. They're timestamped, attributed, and shown in chronological order. Use `skate comment` or `skate_comment`.
+
+**Content blocks** are the card's persistent body — the Description section. Use them for long-term reference material: discoveries, architectural decisions, important findings, code patterns, or anything future agents/humans should know when revisiting this task.
+
+**Available block types:**
+```bash
+skate add-content <ID> "Some reference notes"              # text (default)
+skate add-content <ID> "Architecture" -t h2                # heading (h1, h2, h3)
+skate add-content <ID> -t divider                          # horizontal divider
+skate add-content <ID> "Review security audit" -t checkbox # checkbox item
+skate add-content <ID> ./diagram.png -t image              # inline image (uploads file)
+```
+MCP: `skate_add_content` with `block_type` parameter (text, h1, h2, h3, divider, checkbox, image). For image, pass the **absolute** file path as `text` to avoid working directory issues.
+
+**When to add content blocks:**
+- You discovered something non-obvious about the code while working on a task
+- The user pointed out context, constraints, or decisions worth preserving
+- You want to document a pattern, workaround, or edge case for future reference
+- There's a diagram or visual that helps understand the task — add a text block with description, then an image block
+
+**Format for text content blocks:**
+Start each text block with your signature and timestamp so it's clear who added it and when:
+```
+— claude-code (claude-opus-4-6) | 2026-04-03
+
+Discovered that the plugin adapter hardcodes all board-scoped WS messages
+as UPDATE_BOARD events. The actual action type is inside the payload.
+```
+
 ## Mentions in comments
 
 By default, mention the last relevant person when adding comments — this notifies them in Mattermost. Use `@username` at the start of your comment text.

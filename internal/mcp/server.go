@@ -294,6 +294,163 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 		return textResult("Comment added."), nil, nil
 	})
 
+	// skate_add_content
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_add_content",
+		Description: "Add a content block to a task's description. Use for long-term reference notes, discoveries, headings, dividers, checklists, and inline images.",
+		InputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"task_id"},
+			"properties": map[string]any{
+				"task_id":    map[string]any{"type": "string", "description": "Task/card ID"},
+				"text":       map[string]any{"type": "string", "description": "Block text (required for all types except divider). For image type, this is the local file path."},
+				"block_type": map[string]any{"type": "string", "description": "Block type: text (default), h1, h2, h3, divider, checkbox, image", "default": "text"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+		cardID := getStr(input, "task_id")
+		text := getStr(input, "text")
+		blockType := getStr(input, "block_type")
+		if blockType == "" {
+			blockType = "text"
+		}
+
+		validTypes := map[string]bool{"text": true, "h1": true, "h2": true, "h3": true, "divider": true, "checkbox": true, "image": true}
+		if !validTypes[blockType] {
+			return errResult(fmt.Errorf("invalid block_type %q. Supported: text, h1, h2, h3, divider, checkbox, image", blockType)), nil, nil
+		}
+
+		card, err := svc.GetCard(cardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+
+		if blockType == "image" {
+			if text == "" {
+				return errResult(fmt.Errorf("file path is required for image blocks")), nil, nil
+			}
+			fileID, err := svc.UploadFile(cfg.TeamID, card.BoardID, text)
+			if err != nil {
+				return errResult(fmt.Errorf("uploading image: %w", err)), nil, nil
+			}
+			now := time.Now().UnixMilli()
+			block := &boards.Block{
+				ParentID: cardID,
+				BoardID:  card.BoardID,
+				Type:     "image",
+				Title:    text,
+				Fields:   map[string]interface{}{"fileId": fileID},
+				CreateAt: now,
+				UpdateAt: now,
+			}
+			if _, err := svc.CreateBlock(card.BoardID, []*boards.Block{block}); err != nil {
+				return errResult(err), nil, nil
+			}
+			return textResult(fmt.Sprintf("Image content block added (fileId: %s).", fileID)), nil, nil
+		}
+
+		if blockType != "divider" && text == "" {
+			return errResult(fmt.Errorf("text is required for %s blocks", blockType)), nil, nil
+		}
+
+		now := time.Now().UnixMilli()
+		block := &boards.Block{ParentID: cardID, BoardID: card.BoardID, Type: blockType, Title: text, CreateAt: now, UpdateAt: now}
+		if _, err := svc.CreateBlock(card.BoardID, []*boards.Block{block}); err != nil {
+			return errResult(err), nil, nil
+		}
+		return textResult(fmt.Sprintf("Content block added (%s).", blockType)), nil, nil
+	})
+
+	// skate_comments
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_comments",
+		Description: "Get all comments for a task",
+		InputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"task_id"},
+			"properties": map[string]any{
+				"task_id": map[string]any{"type": "string", "description": "Task/card ID"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+		cardID := getStr(input, "task_id")
+		card, err := svc.GetCard(cardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		blocks, err := svc.GetBlocks(card.BoardID, cardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		uc := boards.NewUserCache(svc)
+		defer uc.Flush()
+		tr := translate.New(cfg.Translate)
+		md := boards.RenderComments(blocks, uc, tr)
+		return textResult(md), nil, nil
+	})
+
+	// skate_task_files
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_task_files",
+		Description: "List files attached to a task",
+		InputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"task_id"},
+			"properties": map[string]any{
+				"task_id": map[string]any{"type": "string", "description": "Task/card ID"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+		cardID := getStr(input, "task_id")
+		card, err := svc.GetCard(cardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		blocks, err := svc.GetBlocks(card.BoardID, cardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		var lines []string
+		for _, b := range blocks {
+			if b.Type == "image" || b.Type == "attachment" {
+				fileID := ""
+				if fid, ok := b.Fields["fileId"]; ok {
+					fileID = fmt.Sprintf("%v", fid)
+				}
+				name := b.Title
+				if name == "" {
+					name = fileID
+				}
+				lines = append(lines, fmt.Sprintf("- %s (type: %s, fileId: %s)", name, b.Type, fileID))
+			}
+		}
+		if len(lines) == 0 {
+			return textResult("No files attached."), nil, nil
+		}
+		return textResult(strings.Join(lines, "\n")), nil, nil
+	})
+
+	// skate_config
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_config",
+		Description: "Show effective skate configuration (mentions, translate, board settings)",
+		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+		lines := []string{
+			fmt.Sprintf("mattermost_url: %s", cfg.MattermostURL),
+			fmt.Sprintf("team_id: %s", cfg.TeamID),
+		}
+		if cfg.BoardID != "" {
+			lines = append(lines, fmt.Sprintf("board_id: %s", cfg.BoardID))
+		}
+		lines = append(lines,
+			fmt.Sprintf("only_mine: %v", cfg.OnlyMine),
+			fmt.Sprintf("mentions: %v", cfg.MentionsEnabled()),
+			fmt.Sprintf("translate: %s", translate.FormatProviderInfo(cfg.Translate)),
+		)
+		return textResult(strings.Join(lines, "\n")), nil, nil
+	})
+
 	// skate_timer_start
 	mcpsdk.AddTool(s, &mcpsdk.Tool{
 		Name:        "skate_timer_start",

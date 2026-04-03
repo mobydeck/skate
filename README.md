@@ -150,6 +150,11 @@ skate create "Fix login bug" --status "Not Started" --priority "High"
 skate create "New feature" --description "Detailed description here"
 skate update-status <TASK_ID> "In Progress"
 skate comment <TASK_ID> "Implemented the fix, running tests"
+skate add-content <TASK_ID> "Discovery: the API requires ..."   # text block (default)
+skate add-content <TASK_ID> "Architecture" -t h2               # heading block
+skate add-content <TASK_ID> -t divider                         # divider block
+skate add-content <TASK_ID> "Review audit" -t checkbox         # checkbox block
+skate add-content <TASK_ID> ./diagram.png -t image             # inline image block
 skate attach <TASK_ID> ./screenshot.png
 ```
 
@@ -170,6 +175,13 @@ skate timer-start <TASK_ID>                     # Start timer (auto-stops previo
 skate timer-stop --notes "Completed feature"    # Stop running timer
 skate time-add <TASK_ID> 01:30 --notes "Code review"   # Add manual time
 skate time-add <TASK_ID> 02:00 --date 2026-04-01       # Backdate entry
+```
+
+### Configuration
+
+```bash
+skate config                          # Show effective config (merged global + local + env)
+skate config --json                   # JSON output
 ```
 
 ### Output Formats
@@ -195,6 +207,10 @@ When connected via MCP, AI agents can use these tools:
 | `skate_update_status` | Change task status |
 | `skate_create_task` | Create a new task |
 | `skate_comment` | Add a comment to a task |
+| `skate_add_content` | Add a content block (text, h1-h3, divider, checkbox, image) |
+| `skate_comments` | Get all comments for a task |
+| `skate_task_files` | List files attached to a task |
+| `skate_config` | Show effective configuration (mentions, translate) |
 | `skate_timer_start` | Start timer on a task |
 | `skate_timer_stop` | Stop running timer with notes |
 | `skate_time_add` | Add manual time entry |
@@ -247,6 +263,7 @@ mattermost_url: "https://mm.example.com"
 token: "your-personal-access-token"
 team_id: "your-team-id"
 only_mine: false           # show only your tasks by default
+mentions: true             # @mention users in agent comments (default: true)
 
 translate:
   enabled: false
@@ -259,6 +276,13 @@ translate:
 ```yaml
 # .skate.yaml (in project root)
 board_id: "your-board-id"
+
+# Local config can also override global settings per project:
+# mattermost_url: "https://other-server.com"
+# mentions: false
+# translate:
+#   enabled: true
+#   model: llama3
 ```
 
 ## Environment Variables

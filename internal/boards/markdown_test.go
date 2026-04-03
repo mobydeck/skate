@@ -78,6 +78,31 @@ func TestRenderCardMarkdown_Attachments(t *testing.T) {
 	}
 }
 
+func TestRenderCardMarkdown_InlineImage(t *testing.T) {
+	card := &Card{Title: "Test"}
+	board := &Board{}
+	blocks := []*Block{
+		{Type: "text", Title: "Some text before"},
+		{Type: "image", Title: "screenshot.png", Fields: map[string]interface{}{"fileId": "img123"}},
+		{Type: "text", Title: "Some text after"},
+	}
+
+	md := RenderCardMarkdown(card, board, blocks, nil, nil, nil)
+
+	if !strings.Contains(md, "## Description") {
+		t.Error("should have description section")
+	}
+	if !strings.Contains(md, "![screenshot.png](fileId: img123)") {
+		t.Error("should render inline image with fileId")
+	}
+	if !strings.Contains(md, "Some text before") || !strings.Contains(md, "Some text after") {
+		t.Error("should contain surrounding text blocks")
+	}
+	if strings.Contains(md, "## Attachments") {
+		t.Error("image blocks should not appear in attachments section")
+	}
+}
+
 func TestRenderCardMarkdown_TimeTracking(t *testing.T) {
 	card := &Card{Title: "Test"}
 	board := &Board{}
@@ -139,6 +164,94 @@ type mockTranslator struct {
 
 func (m *mockTranslator) Translate(text string) string {
 	return m.prefix + text
+}
+
+func TestRenderCardMarkdown_MaxComments(t *testing.T) {
+	card := &Card{Title: "Test"}
+	board := &Board{}
+	now := time.Now().UnixMilli()
+	blocks := []*Block{
+		{Type: "comment", Title: "Comment 1", CreatedBy: "u1", CreateAt: now - 5000},
+		{Type: "comment", Title: "Comment 2", CreatedBy: "u2", CreateAt: now - 4000},
+		{Type: "comment", Title: "Comment 3", CreatedBy: "u3", CreateAt: now - 3000},
+		{Type: "comment", Title: "Comment 4", CreatedBy: "u4", CreateAt: now - 2000},
+		{Type: "comment", Title: "Comment 5", CreatedBy: "u5", CreateAt: now - 1000},
+	}
+
+	// Limit to 2 comments: should show last 2 and hide 3
+	md := RenderCardMarkdown(card, board, blocks, nil, nil, nil, 2)
+
+	if !strings.Contains(md, "Comment 4") || !strings.Contains(md, "Comment 5") {
+		t.Error("should show last 2 comments")
+	}
+	if strings.Contains(md, "Comment 1") || strings.Contains(md, "Comment 2") {
+		t.Error("should hide earlier comments")
+	}
+	if !strings.Contains(md, "3 earlier comments not shown") {
+		t.Error("should show hidden count")
+	}
+
+	// No limit (0): should show all
+	md = RenderCardMarkdown(card, board, blocks, nil, nil, nil)
+	if !strings.Contains(md, "Comment 1") || !strings.Contains(md, "Comment 5") {
+		t.Error("should show all comments when no limit")
+	}
+}
+
+func TestRenderCardMarkdown_CommentsSortedByDate(t *testing.T) {
+	card := &Card{Title: "Test"}
+	board := &Board{}
+	now := time.Now().UnixMilli()
+	blocks := []*Block{
+		{Type: "comment", Title: "Third", CreatedBy: "u1", CreateAt: now},
+		{Type: "comment", Title: "First", CreatedBy: "u2", CreateAt: now - 2000},
+		{Type: "comment", Title: "Second", CreatedBy: "u3", CreateAt: now - 1000},
+	}
+
+	md := RenderCardMarkdown(card, board, blocks, nil, nil, nil)
+
+	firstIdx := strings.Index(md, "First")
+	secondIdx := strings.Index(md, "Second")
+	thirdIdx := strings.Index(md, "Third")
+
+	if firstIdx > secondIdx || secondIdx > thirdIdx {
+		t.Errorf("comments should be sorted chronologically: First(%d) Second(%d) Third(%d)", firstIdx, secondIdx, thirdIdx)
+	}
+}
+
+func TestRenderComments(t *testing.T) {
+	now := time.Now().UnixMilli()
+	blocks := []*Block{
+		{Type: "text", Title: "Not a comment"},
+		{Type: "comment", Title: "Comment B", CreatedBy: "u1", CreateAt: now},
+		{Type: "comment", Title: "Comment A", CreatedBy: "u2", CreateAt: now - 1000},
+	}
+
+	md := RenderComments(blocks, nil, nil)
+
+	if !strings.Contains(md, "Comment A") || !strings.Contains(md, "Comment B") {
+		t.Error("should contain both comments")
+	}
+	if strings.Contains(md, "Not a comment") {
+		t.Error("should not contain non-comment blocks")
+	}
+
+	// Verify sorted chronologically (A before B)
+	aIdx := strings.Index(md, "Comment A")
+	bIdx := strings.Index(md, "Comment B")
+	if aIdx > bIdx {
+		t.Error("comments should be sorted chronologically (A before B)")
+	}
+}
+
+func TestRenderComments_Empty(t *testing.T) {
+	blocks := []*Block{
+		{Type: "text", Title: "Just text"},
+	}
+	md := RenderComments(blocks, nil, nil)
+	if md != "No comments.\n" {
+		t.Errorf("expected 'No comments.', got %q", md)
+	}
 }
 
 func TestComputeElapsed(t *testing.T) {

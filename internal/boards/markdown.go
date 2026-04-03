@@ -43,21 +43,21 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 	sb.WriteString("\n")
 
 	// Content blocks
-	var textBlocks, comments, attachments []*Block
+	var contentBlocks, comments, attachments []*Block
 	for _, b := range blocks {
 		switch b.Type {
-		case "text", "divider", "checkbox", "h1", "h2", "h3":
-			textBlocks = append(textBlocks, b)
+		case "text", "divider", "checkbox", "h1", "h2", "h3", "image":
+			contentBlocks = append(contentBlocks, b)
 		case "comment":
 			comments = append(comments, b)
-		case "image", "attachment":
+		case "attachment":
 			attachments = append(attachments, b)
 		}
 	}
 
-	if len(textBlocks) > 0 {
+	if len(contentBlocks) > 0 {
 		sb.WriteString("## Description\n\n")
-		for _, b := range textBlocks {
+		for _, b := range contentBlocks {
 			switch b.Type {
 			case "h1":
 				sb.WriteString("# " + tl(tr, b.Title) + "\n\n")
@@ -73,6 +73,16 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 					checked = "x"
 				}
 				sb.WriteString(fmt.Sprintf("- [%s] %s\n", checked, tl(tr, b.Title)))
+			case "image":
+				fileID := ""
+				if fid, ok := b.Fields["fileId"]; ok {
+					fileID = fmt.Sprintf("%v", fid)
+				}
+				name := b.Title
+				if name == "" {
+					name = fileID
+				}
+				sb.WriteString(fmt.Sprintf("![%s](fileId: %s)\n\n", name, fileID))
 			default:
 				sb.WriteString(tl(tr, b.Title) + "\n\n")
 			}

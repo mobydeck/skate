@@ -252,6 +252,31 @@ func TestSave_OmitsEmpty(t *testing.T) {
 	}
 }
 
+func TestSaveLocal(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".skate.yaml")
+
+	if err := SaveLocal(path, "board-xyz"); err != nil {
+		t.Fatalf("SaveLocal: %v", err)
+	}
+
+	data, _ := os.ReadFile(path)
+	content := string(data)
+
+	if !contains(content, "board_id: board-xyz") {
+		t.Error("should contain board_id")
+	}
+	if contains(content, "mattermost_url") {
+		t.Error("should not contain mattermost_url")
+	}
+	if contains(content, "translate") {
+		t.Error("should not contain translate")
+	}
+	if contains(content, "mentions") {
+		t.Error("should not contain mentions")
+	}
+}
+
 func TestBaseURL(t *testing.T) {
 	cfg := &Config{MattermostURL: "https://mm.example.com"}
 	got := BaseURL(cfg)
