@@ -21,7 +21,7 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 	if icon != "" {
 		icon += " "
 	}
-	sb.WriteString(fmt.Sprintf("# %s%s\n\n", icon, tl(tr, card.Title)))
+	fmt.Fprintf(&sb, "# %s%s\n\n", icon, tl(tr, card.Title))
 
 	// Properties table
 	sb.WriteString("| Property | Value |\n|----------|-------|\n")
@@ -34,11 +34,18 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 		if resolved == "" {
 			continue
 		}
-		// Resolve person properties to usernames
+		// Resolve person properties to usernames with @ prefix
 		if (d.Type == "person" || d.Type == "multiPerson") && uc != nil {
-			resolved = uc.Resolve(resolved)
+			resolved = "@" + uc.Resolve(resolved)
 		}
-		sb.WriteString(fmt.Sprintf("| %s | %s |\n", d.Name, resolved))
+		fmt.Fprintf(&sb, "| %s | %s |\n", d.Name, resolved)
+	}
+	if card.CreatedBy != "" {
+		creator := card.CreatedBy
+		if uc != nil {
+			creator = uc.Resolve(card.CreatedBy)
+		}
+		fmt.Fprintf(&sb, "| Created By | @%s |\n", creator)
 	}
 	sb.WriteString("\n")
 
@@ -72,7 +79,7 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 				if v, ok := b.Fields["value"]; ok && v == true {
 					checked = "x"
 				}
-				sb.WriteString(fmt.Sprintf("- [%s] %s\n", checked, tl(tr, b.Title)))
+				fmt.Fprintf(&sb, "- [%s] %s\n", checked, tl(tr, b.Title))
 			case "image":
 				fileID := ""
 				if fid, ok := b.Fields["fileId"]; ok {
@@ -82,7 +89,7 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 				if name == "" {
 					name = fileID
 				}
-				sb.WriteString(fmt.Sprintf("![%s](fileId: %s)\n\n", name, fileID))
+				fmt.Fprintf(&sb, "![%s](fileId: %s)\n\n", name, fileID)
 			default:
 				sb.WriteString(tl(tr, b.Title) + "\n\n")
 			}
@@ -108,7 +115,7 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 
 		sb.WriteString("## Comments\n\n")
 		if hidden > 0 {
-			sb.WriteString(fmt.Sprintf("*(%d earlier comments not shown, use --full to see all)*\n\n", hidden))
+			fmt.Fprintf(&sb, "*(%d earlier comments not shown, use --full to see all)*\n\n", hidden)
 		}
 		for _, c := range shown {
 			date := FormatTimestamp(c.CreateAt)
@@ -116,7 +123,7 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 			if uc != nil {
 				author = uc.Resolve(c.CreatedBy)
 			}
-			sb.WriteString(fmt.Sprintf("**@%s** (%s):\n> %s\n\n", author, date, tl(tr, c.Title)))
+			fmt.Fprintf(&sb, "**@%s** (%s):\n> %s\n\n", author, date, tl(tr, c.Title))
 		}
 	}
 
@@ -131,7 +138,7 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 			if name == "" {
 				name = fileID
 			}
-			sb.WriteString(fmt.Sprintf("- %s (type: %s, fileId: %s)\n", name, a.Type, fileID))
+			fmt.Fprintf(&sb, "- %s (type: %s, fileId: %s)\n", name, a.Type, fileID)
 		}
 		sb.WriteString("\n")
 	}
@@ -147,14 +154,14 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 
 			if ts.RunningEntry != nil {
 				elapsed := computeElapsed(ts.RunningEntry.StartTime)
-				sb.WriteString(fmt.Sprintf("- @%s: %s + %s running\n", userName, ts.TotalDisplay, FormatDuration(elapsed)))
+				fmt.Fprintf(&sb, "- @%s: %s + %s running\n", userName, ts.TotalDisplay, FormatDuration(elapsed))
 				totalSeconds += ts.TotalSeconds + elapsed
 			} else {
-				sb.WriteString(fmt.Sprintf("- @%s: %s\n", userName, ts.TotalDisplay))
+				fmt.Fprintf(&sb, "- @%s: %s\n", userName, ts.TotalDisplay)
 				totalSeconds += ts.TotalSeconds
 			}
 		}
-		sb.WriteString(fmt.Sprintf("\nTotal: %s\n", FormatDuration(totalSeconds)))
+		fmt.Fprintf(&sb, "\nTotal: %s\n", FormatDuration(totalSeconds))
 	}
 
 	return sb.String()
@@ -183,7 +190,7 @@ func RenderComments(blocks []*Block, uc *UserCache, tr TextTranslator) string {
 		if uc != nil {
 			author = uc.Resolve(c.CreatedBy)
 		}
-		sb.WriteString(fmt.Sprintf("**@%s** (%s):\n> %s\n\n", author, date, tl(tr, c.Title)))
+		fmt.Fprintf(&sb, "**@%s** (%s):\n> %s\n\n", author, date, tl(tr, c.Title))
 	}
 	return sb.String()
 }

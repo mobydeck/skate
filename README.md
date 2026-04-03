@@ -116,6 +116,8 @@ skate comments <TASK_ID>              # View all comments for a task
 skate task-files <TASK_ID>            # List attached files
 skate download <FILE_ID>              # Download a file (board from .skate.yaml)
 skate download <FILE_ID> -b <BOARD>   # Download from specific board
+skate find "search term"              # Search tasks by title and content
+skate find "bug" --json               # Search with JSON output
 ```
 
 Task detail renders as markdown:
@@ -210,6 +212,7 @@ When connected via MCP, AI agents can use these tools:
 | `skate_add_content` | Add a content block (text, h1-h3, divider, checkbox, image) |
 | `skate_comments` | Get all comments for a task |
 | `skate_task_files` | List files attached to a task |
+| `skate_find` | Search tasks by title and content |
 | `skate_config` | Show effective configuration (mentions, translate) |
 | `skate_timer_start` | Start timer on a task |
 | `skate_timer_stop` | Stop running timer with notes |

@@ -375,6 +375,73 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 		return textResult(fmt.Sprintf("Content block added (%s).", blockType)), nil, nil
 	})
 
+	// skate_find
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_find",
+		Description: "Search tasks by title and content. Returns title matches first, then content matches with snippets.",
+		InputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"query"},
+			"properties": map[string]any{
+				"query":    map[string]any{"type": "string", "description": "Search query (case-insensitive, partial match)"},
+				"board_id": map[string]any{"type": "string", "description": "Board ID (optional, uses default from config)"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+		query := strings.ToLower(getStr(input, "query"))
+		boardID := getStr(input, "board_id")
+		if boardID == "" {
+			boardID = cfg.BoardID
+		}
+		if boardID == "" {
+			return errResult(fmt.Errorf("board_id required")), nil, nil
+		}
+
+		board, err := svc.GetBoard(boardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		cards, err := svc.ListCards(boardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+
+		defs := boards.ParsePropertyDefs(board)
+		resolved := boards.ResolveCards(cards, defs)
+
+		var lines []string
+		for _, rc := range resolved {
+			if strings.Contains(strings.ToLower(rc.Title), query) {
+				lines = append(lines, fmt.Sprintf("- [%s] %s | Status: %s | Match: title", rc.ID, rc.Title, rc.Status))
+			}
+		}
+		for _, rc := range resolved {
+			if strings.Contains(strings.ToLower(rc.Title), query) {
+				continue
+			}
+			blocks, err := svc.GetBlocks(boardID, rc.ID)
+			if err != nil {
+				continue
+			}
+			for _, b := range blocks {
+				if strings.Contains(strings.ToLower(b.Title), query) {
+					snippet := b.Title
+					runes := []rune(snippet)
+					if len(runes) > 80 {
+						snippet = string(runes[:77]) + "..."
+					}
+					lines = append(lines, fmt.Sprintf("- [%s] %s | Status: %s | Match in %s: %s", rc.ID, rc.Title, rc.Status, b.Type, snippet))
+					break
+				}
+			}
+		}
+
+		if len(lines) == 0 {
+			return textResult("No tasks found."), nil, nil
+		}
+		return textResult(strings.Join(lines, "\n")), nil, nil
+	})
+
 	// skate_comments
 	mcpsdk.AddTool(s, &mcpsdk.Tool{
 		Name:        "skate_comments",
