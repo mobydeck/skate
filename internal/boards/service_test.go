@@ -1,0 +1,183 @@
+package boards
+
+import (
+	"testing"
+)
+
+func TestParsePropertyDefs(t *testing.T) {
+	board := &Board{
+		CardProperties: []map[string]interface{}{
+			{
+				"id":   "prop-1",
+				"name": "Status",
+				"type": "select",
+				"options": []interface{}{
+					map[string]interface{}{"id": "opt-1", "value": "To Do", "color": "red"},
+					map[string]interface{}{"id": "opt-2", "value": "Done", "color": "green"},
+				},
+			},
+			{
+				"id":   "prop-2",
+				"name": "Assignee",
+				"type": "person",
+			},
+		},
+	}
+
+	defs := ParsePropertyDefs(board)
+	if len(defs) != 2 {
+		t.Fatalf("expected 2 defs, got %d", len(defs))
+	}
+
+	if defs[0].Name != "Status" || defs[0].Type != "select" {
+		t.Errorf("first def: got %s/%s", defs[0].Name, defs[0].Type)
+	}
+	if len(defs[0].Options) != 2 {
+		t.Errorf("expected 2 options, got %d", len(defs[0].Options))
+	}
+	if defs[0].Options[0].Value != "To Do" {
+		t.Errorf("first option: got %q", defs[0].Options[0].Value)
+	}
+}
+
+func TestFindPropertyByName(t *testing.T) {
+	defs := []PropertyDef{
+		{ID: "p1", Name: "Status", Type: "select"},
+		{ID: "p2", Name: "Priority", Type: "select"},
+	}
+
+	p := FindPropertyByName(defs, "status") // case-insensitive
+	if p == nil || p.ID != "p1" {
+		t.Error("should find Status property")
+	}
+
+	p = FindPropertyByName(defs, "PRIORITY")
+	if p == nil || p.ID != "p2" {
+		t.Error("should find Priority property")
+	}
+
+	p = FindPropertyByName(defs, "nonexistent")
+	if p != nil {
+		t.Error("should return nil for missing property")
+	}
+}
+
+func TestFindOptionByValue(t *testing.T) {
+	def := &PropertyDef{
+		Options: []PropertyOption{
+			{ID: "o1", Value: "Not Started"},
+			{ID: "o2", Value: "In Progress"},
+			{ID: "o3", Value: "Done"},
+		},
+	}
+
+	o := FindOptionByValue(def, "in progress") // case-insensitive
+	if o == nil || o.ID != "o2" {
+		t.Error("should find In Progress option")
+	}
+
+	o = FindOptionByValue(def, "DONE")
+	if o == nil || o.ID != "o3" {
+		t.Error("should find Done option")
+	}
+
+	o = FindOptionByValue(def, "invalid")
+	if o != nil {
+		t.Error("should return nil for missing option")
+	}
+}
+
+func TestResolvePropertyValue(t *testing.T) {
+	defs := []PropertyDef{
+		{
+			ID:   "p1",
+			Name: "Status",
+			Type: "select",
+			Options: []PropertyOption{
+				{ID: "o1", Value: "To Do"},
+				{ID: "o2", Value: "Done"},
+			},
+		},
+		{
+			ID:   "p2",
+			Name: "Notes",
+			Type: "text",
+		},
+	}
+
+	// Select property resolves option ID to value
+	got := ResolvePropertyValue(defs, "p1", "o2")
+	if got != "Done" {
+		t.Errorf("expected 'Done', got %q", got)
+	}
+
+	// Text property returns raw value
+	got = ResolvePropertyValue(defs, "p2", "some text")
+	if got != "some text" {
+		t.Errorf("expected 'some text', got %q", got)
+	}
+
+	// Unknown option ID returns raw
+	got = ResolvePropertyValue(defs, "p1", "unknown-option")
+	if got != "unknown-option" {
+		t.Errorf("expected raw value, got %q", got)
+	}
+
+	// Nil value
+	got = ResolvePropertyValue(defs, "p1", nil)
+	if got != "" {
+		t.Errorf("expected empty, got %q", got)
+	}
+}
+
+func TestSortByPriority(t *testing.T) {
+	cards := []ResolvedCard{
+		{Priority: "3. Low"},
+		{Priority: "1. High"},
+		{Priority: ""},
+		{Priority: "2. Medium"},
+	}
+
+	SortByPriority(cards)
+
+	expected := []string{"1. High", "2. Medium", "3. Low", ""}
+	for i, want := range expected {
+		if cards[i].Priority != want {
+			t.Errorf("index %d: got %q, want %q", i, cards[i].Priority, want)
+		}
+	}
+}
+
+func TestFormatDuration(t *testing.T) {
+	tests := []struct {
+		seconds int64
+		want    string
+	}{
+		{0, "00:00"},
+		{59, "00:01"},   // ceiled
+		{60, "00:01"},
+		{61, "00:02"},   // ceiled
+		{3600, "01:00"},
+		{3661, "01:02"},
+		{7200, "02:00"},
+	}
+
+	for _, tt := range tests {
+		got := FormatDuration(tt.seconds)
+		if got != tt.want {
+			t.Errorf("FormatDuration(%d) = %q, want %q", tt.seconds, got, tt.want)
+		}
+	}
+}
+
+func TestFormatTimestamp(t *testing.T) {
+	got := FormatTimestamp(0)
+	if got != "" {
+		t.Errorf("expected empty for 0, got %q", got)
+	}
+
+	got = FormatTimestamp(1712016000000) // some timestamp
+	if got == "" {
+		t.Error("expected non-empty for valid timestamp")
+	}
+}
