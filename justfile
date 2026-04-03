@@ -74,6 +74,18 @@ release: cross-build checksums
         exit 1
     fi
 
+    # Check if release already exists
+    if gh release view "$tag" &>/dev/null; then
+        echo "Release ${tag} already exists."
+        read -p "Delete existing release and create a new one? [y/N] " confirm
+        if [ "${confirm,,}" != "y" ]; then
+            echo "Aborted."
+            exit 0
+        fi
+        echo "Deleting existing release ${tag}..."
+        gh release delete "$tag" --yes
+    fi
+
     echo "Creating draft release for ${tag}..."
     gh release create "$tag" \
         --draft \
@@ -82,7 +94,8 @@ release: cross-build checksums
         {{ dist }}/skate-* \
         {{ dist }}/checksums.txt
 
-    echo "Draft release created: ${tag}"
+    url=$(gh release view "$tag" --json url -q .url)
+    echo "Draft release created: ${url}"
 
 # Clean build artifacts
 clean:
