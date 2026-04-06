@@ -58,6 +58,23 @@ var updateStatusCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Status updated to %q\n", option.Value)
+
+		if startTimer, _ := cmd.Flags().GetBool("timer"); startTimer {
+			resp, err := svc.StartTimer(card.BoardID, cardID)
+			if err != nil {
+				fmt.Println("Time tracking is not available on this Mattermost instance.")
+			} else {
+				fmt.Printf("Timer started on: %s\n", card.Title)
+				if resp.StoppedEntry != nil {
+					fmt.Printf("Auto-stopped previous timer on: %s (%s)\n", resp.StoppedEntry.CardName, resp.StoppedEntry.DurationDisplay)
+				}
+			}
+		}
+
 		return nil
 	},
+}
+
+func init() {
+	updateStatusCmd.Flags().BoolP("timer", "t", false, "Start timer after updating status")
 }

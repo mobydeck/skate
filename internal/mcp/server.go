@@ -162,18 +162,20 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 	// skate_update_status
 	mcpsdk.AddTool(s, &mcpsdk.Tool{
 		Name:        "skate_update_status",
-		Description: "Change a task's status (e.g., 'Not Started', 'In Progress', 'Done')",
+		Description: "Change a task's status. Optionally start a timer in the same call.",
 		InputSchema: map[string]any{
 			"type":     "object",
 			"required": []string{"task_id", "status"},
 			"properties": map[string]any{
-				"task_id": map[string]any{"type": "string", "description": "Task/card ID"},
-				"status":  map[string]any{"type": "string", "description": "New status value"},
+				"task_id":     map[string]any{"type": "string", "description": "Task/card ID"},
+				"status":      map[string]any{"type": "string", "description": "New status value"},
+				"start_timer": map[string]any{"type": "boolean", "description": "Start timer after updating status (default: false)"},
 			},
 		},
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
 		cardID := getStr(input, "task_id")
 		status := getStr(input, "status")
+		startTimer, _ := input["start_timer"].(bool)
 
 		card, err := svc.GetCard(cardID)
 		if err != nil {
@@ -196,7 +198,20 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 		if _, err := svc.PatchCard(cardID, patch); err != nil {
 			return errResult(err), nil, nil
 		}
-		return textResult(fmt.Sprintf("Status updated to %q", option.Value)), nil, nil
+
+		msg := fmt.Sprintf("Status updated to %q", option.Value)
+		if startTimer {
+			resp, err := svc.StartTimer(card.BoardID, cardID)
+			if err != nil {
+				msg += "\nTime tracking is not available on this Mattermost instance."
+			} else {
+				msg += fmt.Sprintf("\nTimer started on: %s", card.Title)
+				if resp.StoppedEntry != nil {
+					msg += fmt.Sprintf("\nAuto-stopped previous timer on: %s (%s)", resp.StoppedEntry.CardName, resp.StoppedEntry.DurationDisplay)
+				}
+			}
+		}
+		return textResult(msg), nil, nil
 	})
 
 	// skate_create_task

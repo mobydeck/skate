@@ -151,6 +151,7 @@ Total: 00:08
 skate create "Fix login bug" --status "Not Started" --priority "High"
 skate create "New feature" --description "Detailed description here"
 skate update-status <TASK_ID> "In Progress"
+skate update-status <TASK_ID> "In Progress" -t   # update status + start timer
 skate comment <TASK_ID> "Implemented the fix, running tests"
 skate add-content <TASK_ID> "Discovery: the API requires ..."   # text block (default)
 skate add-content <TASK_ID> "Architecture" -t h2               # heading block
@@ -206,7 +207,7 @@ When connected via MCP, AI agents can use these tools:
 | `skate_boards` | List available boards |
 | `skate_tasks` | List tasks (default: active only, use `show_all` for all) |
 | `skate_task` | Get task details as markdown (all comments shown via MCP) |
-| `skate_update_status` | Change task status |
+| `skate_update_status` | Change task status (optionally start timer with `start_timer`) |
 | `skate_create_task` | Create a new task |
 | `skate_comment` | Add a comment to a task |
 | `skate_add_content` | Add a content block (text, h1-h3, divider, checkbox, image) |
