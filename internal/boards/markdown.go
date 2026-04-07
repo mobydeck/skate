@@ -47,6 +47,14 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 		}
 		fmt.Fprintf(&sb, "| Created By | @%s |\n", creator)
 	}
+	// Show available statuses so agents know valid values
+	if statusProp := FindPropertyByName(defs, "Status"); statusProp != nil {
+		var vals []string
+		for _, o := range statusProp.Options {
+			vals = append(vals, o.Value)
+		}
+		fmt.Fprintf(&sb, "| Available Statuses | %s |\n", strings.Join(vals, ", "))
+	}
 	sb.WriteString("\n")
 
 	// Content blocks

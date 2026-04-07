@@ -150,6 +150,7 @@ Total: 00:08
 ```bash
 skate create "Fix login bug" --status "Not Started" --priority "High"
 skate create "New feature" --description "Detailed description here"
+skate statuses                                    # list available statuses for the board
 skate update-status <TASK_ID> "In Progress"
 skate update-status <TASK_ID> "In Progress" -t   # update status + start timer
 skate comment <TASK_ID> "Implemented the fix, running tests"
@@ -204,6 +205,8 @@ When connected via MCP, AI agents can use these tools:
 
 | Tool | Description |
 |------|-------------|
+| `skate_help` | Get workflow guide (call this first) |
+| `skate_statuses` | List available statuses for the board |
 | `skate_boards` | List available boards |
 | `skate_tasks` | List tasks (default: active only, use `show_all` for all) |
 | `skate_task` | Get task details as markdown (all comments shown via MCP) |

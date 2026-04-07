@@ -41,6 +41,82 @@ func RunServer() error {
 }
 
 func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) error {
+	// skate_help
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_help",
+		Description: "Get Skate workflow guide. Call this first to understand how to use Skate tools for task management.",
+		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+		help := `# Skate — Task Management for AI Agents
+
+Skate connects to Mattermost Boards. Follow this workflow:
+
+## Starting a task
+1. skate_tasks — list active tasks (Not Started / In Progress)
+2. skate_task — read full task details (description, comments, attachments)
+3. skate_task_files — check for attached files, download if relevant
+4. skate_find — search for related tasks by keyword
+5. skate_update_status — set "In Progress" with start_timer: true
+
+## While working
+- skate_comment — add progress comments (mention @last_commenter, append signature)
+- skate_add_content — add persistent notes to the task description
+- skate_create_task — create sub-tasks or new tasks from discoveries
+
+## Finishing
+1. skate_timer_stop — stop timer with notes about what was done
+2. skate_update_status — set "Completed 🙌" (or "Done" depending on board)
+3. skate_comment — add final summary
+
+## Conventions
+- Always mention the last relevant person: @username at start of comment
+- Always sign comments: — agent-name (model-name)
+- Check skate_config for mentions and translate settings
+- Use skate_boards to see available boards
+
+## IMPORTANT: Statuses vary per board
+Call skate_statuses BEFORE updating status to see valid values for the current board.
+Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" vs "Done").`
+
+		return textResult(help), nil, nil
+	})
+
+	// skate_statuses
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_statuses",
+		Description: "List available statuses for the board. Call this before skate_update_status to avoid invalid status errors.",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"board_id": map[string]any{"type": "string", "description": "Board ID (optional, uses default from config)"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+		boardID := getStr(input, "board_id")
+		if boardID == "" {
+			boardID = cfg.BoardID
+		}
+		if boardID == "" {
+			return errResult(fmt.Errorf("board_id required")), nil, nil
+		}
+
+		board, err := svc.GetBoard(boardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		defs := boards.ParsePropertyDefs(board)
+		statusProp := boards.FindPropertyByName(defs, "Status")
+		if statusProp == nil {
+			return errResult(fmt.Errorf("board has no Status property")), nil, nil
+		}
+
+		var values []string
+		for _, o := range statusProp.Options {
+			values = append(values, o.Value)
+		}
+		return textResult("Available statuses: " + strings.Join(values, ", ")), nil, nil
+	})
+
 	// skate_boards
 	mcpsdk.AddTool(s, &mcpsdk.Tool{
 		Name:        "skate_boards",
