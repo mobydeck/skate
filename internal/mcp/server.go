@@ -46,37 +46,50 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 		Name:        "skate_help",
 		Description: "Get Skate workflow guide. Call this first to understand how to use Skate tools for task management.",
 		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
-		help := `# Skate — Task Management for AI Agents
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
+		boardSection := `## IMPORTANT: board_id parameter
+Many tools require a board_id. You MUST pass it explicitly to: skate_tasks, skate_statuses, skate_find, skate_create_task.
+No default board_id is configured. Call skate_boards to list boards, then use the correct ID.`
+
+		if cfg.BoardID != "" {
+			boardSection = fmt.Sprintf(`## Board ID
+Your configured board_id is: %s
+Pass this to skate_tasks, skate_statuses, skate_find, and skate_create_task.`, cfg.BoardID)
+		}
+
+		help := fmt.Sprintf(`# Skate — Task Management for AI Agents
 
 Skate connects to Mattermost Boards. Follow this workflow:
 
+%s
+
 ## Starting a task
-1. skate_tasks — list active tasks (Not Started / In Progress)
-2. skate_task — read full task details (description, comments, attachments)
-3. skate_task_files — check for attached files, download if relevant
-4. skate_find — search for related tasks by keyword
-5. skate_update_status — set "In Progress" with start_timer: true
+1. skate_boards — get available boards and their IDs
+2. skate_tasks — list active tasks (pass board_id if needed)
+3. skate_task — read full task details (description, comments, attachments)
+4. skate_task_files — check for attached files, download if relevant
+5. skate_find — search for related tasks by keyword (pass board_id if needed)
+6. skate_statuses — check available statuses for the board (pass board_id if needed)
+7. skate_update_status — set "In Progress" with start_timer: true
 
 ## While working
 - skate_comment — add progress comments (mention @last_commenter, append signature)
 - skate_add_content — add persistent notes to the task description
-- skate_create_task — create sub-tasks or new tasks from discoveries
+- skate_create_task — create new tasks (pass board_id if needed)
 
 ## Finishing
 1. skate_timer_stop — stop timer with notes about what was done
-2. skate_update_status — set "Completed 🙌" (or "Done" depending on board)
+2. skate_update_status — set final status (call skate_statuses first to see valid values)
 3. skate_comment — add final summary
 
 ## Conventions
 - Always mention the last relevant person: @username at start of comment
 - Always sign comments: — agent-name (model-name)
 - Check skate_config for mentions and translate settings
-- Use skate_boards to see available boards
 
 ## IMPORTANT: Statuses vary per board
 Call skate_statuses BEFORE updating status to see valid values for the current board.
-Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" vs "Done").`
+Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" vs "Done").`, boardSection)
 
 		return textResult(help), nil, nil
 	})
@@ -91,7 +104,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"board_id": map[string]any{"type": "string", "description": "Board ID (optional, uses default from config)"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		boardID := getStr(input, "board_id")
 		if boardID == "" {
 			boardID = cfg.BoardID
@@ -122,7 +135,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 		Name:        "skate_boards",
 		Description: "List available Mattermost boards for the current user",
 		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		boardList, err := svc.ListBoards()
 		if err != nil {
 			return errResult(err), nil, nil
@@ -146,7 +159,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"show_all": map[string]any{"type": "boolean", "description": "Show all tasks regardless of status (default: false)"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		boardID := getStr(input, "board_id")
 		if boardID == "" {
 			boardID = cfg.BoardID
@@ -213,7 +226,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"task_id": map[string]any{"type": "string", "description": "Task/card ID"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		cardID := getStr(input, "task_id")
 		card, err := svc.GetCard(cardID)
 		if err != nil {
@@ -248,7 +261,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"start_timer": map[string]any{"type": "boolean", "description": "Start timer after updating status (default: false)"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		cardID := getStr(input, "task_id")
 		status := getStr(input, "status")
 		startTimer, _ := input["start_timer"].(bool)
@@ -305,7 +318,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"description": map[string]any{"type": "string", "description": "Task description"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		boardID := getStr(input, "board_id")
 		if boardID == "" {
 			boardID = cfg.BoardID
@@ -369,7 +382,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"text":    map[string]any{"type": "string", "description": "Comment text"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		cardID := getStr(input, "task_id")
 		text := getStr(input, "text")
 
@@ -398,7 +411,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"block_type": map[string]any{"type": "string", "description": "Block type: text (default), h1, h2, h3, divider, checkbox, image", "default": "text"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		cardID := getStr(input, "task_id")
 		text := getStr(input, "text")
 		blockType := getStr(input, "block_type")
@@ -478,7 +491,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"board_id": map[string]any{"type": "string", "description": "Board ID (optional, uses default from config)"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		query := strings.ToLower(getStr(input, "query"))
 		boardID := getStr(input, "board_id")
 		if boardID == "" {
@@ -544,7 +557,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"task_id": map[string]any{"type": "string", "description": "Task/card ID"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		cardID := getStr(input, "task_id")
 		card, err := svc.GetCard(cardID)
 		if err != nil {
@@ -572,7 +585,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"task_id": map[string]any{"type": "string", "description": "Task/card ID"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		cardID := getStr(input, "task_id")
 		card, err := svc.GetCard(cardID)
 		if err != nil {
@@ -607,7 +620,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 		Name:        "skate_config",
 		Description: "Show effective skate configuration (mentions, translate, board settings)",
 		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		lines := []string{
 			fmt.Sprintf("mattermost_url: %s", cfg.MattermostURL),
 			fmt.Sprintf("team_id: %s", cfg.TeamID),
@@ -634,7 +647,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"task_id": map[string]any{"type": "string", "description": "Task/card ID"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		cardID := getStr(input, "task_id")
 		card, err := svc.GetCard(cardID)
 		if err != nil {
@@ -661,7 +674,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"notes": map[string]any{"type": "string", "description": "Notes about the work done"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		notes := getStr(input, "notes")
 		timer, err := svc.GetRunningTimer()
 		if err != nil {
@@ -691,7 +704,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"date":     map[string]any{"type": "string", "description": "Date in YYYY-MM-DD format (default: today)"},
 			},
 		},
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
 		cardID := getStr(input, "task_id")
 		duration := getStr(input, "duration")
 		notes := getStr(input, "notes")

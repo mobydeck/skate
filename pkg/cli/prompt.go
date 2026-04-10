@@ -7,11 +7,13 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"skate/internal/config"
 )
 
 var promptCmd = &cobra.Command{
 	Use:   "prompt <agent>",
-	Short: "Print an initial prompt that points the AI agent to the skate skill file",
+	Short: "Print an initial prompt that points the AI agent to the skate skill file and board",
 	Long:  "Supported agents: claude-code (claude), cursor, codex",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -27,6 +29,13 @@ var promptCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Before starting work, read and follow rules in %s\n", skillPath)
+
+		// Include board_id if available
+		cfg, err := config.Load()
+		if err == nil && cfg.BoardID != "" {
+			fmt.Printf("Use board_id: %s for all skate MCP tools that require it.\n", cfg.BoardID)
+		}
+
 		return nil
 	},
 }

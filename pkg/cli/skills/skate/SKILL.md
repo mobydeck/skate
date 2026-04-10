@@ -7,9 +7,17 @@ description: Access Mattermost Boards tasks via Skate. Use to view, update, crea
 
 You have access to project tasks on Mattermost Boards via Skate. Use these tools to stay aligned with the project plan.
 
+## Board ID (MCP users)
+
+When using MCP tools, the `board_id` may not be auto-detected (the MCP server may not inherit your project's `.skate.yaml`). If you get "board_id required" errors:
+1. Call `skate_boards` to list available boards and their IDs
+2. Pass the correct `board_id` to `skate_tasks`, `skate_statuses`, `skate_find`, and `skate_create_task`
+
+CLI users in a project with `.skate.yaml` do not need to worry about this.
+
 ## Before starting work
 
-1. List available tasks: `skate tasks` or use `skate_tasks` tool
+1. List available tasks: `skate tasks` or `skate_tasks` (pass `board_id` if needed)
 2. Review task details before working: `skate task <ID>` or `skate_task` (shows last 5 comments; use `--full` for all)
    - To see all comments only: `skate comments <ID>`
 3. **Check for attached files**: use `skate task-files <ID>` to list attachments. If the task has images, text, markdown, config files, or other readable files — download and review them before starting. They often contain essential context, screenshots of bugs, or reference material.
