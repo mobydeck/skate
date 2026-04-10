@@ -12,6 +12,9 @@ Skate lets you manage project tasks, track time, and collaborate with AI coding 
 brew install mobydeck/tap/skate
 ```
 
+> **macOS note:** If Gatekeeper blocks the binary on first run, allow it with:
+> `xattr -d com.apple.quarantine $(which skate)`
+
 ### Binary download
 
 Download from [Releases](https://github.com/mobydeck/skate/releases), or build from source:
