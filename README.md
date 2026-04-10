@@ -6,7 +6,15 @@ Skate lets you manage project tasks, track time, and collaborate with AI coding 
 
 ## Install
 
-Download a binary from [Releases](https://github.com/mobydeck/skate/releases), or build from source:
+### Homebrew (macOS / Linux)
+
+```bash
+brew install mobydeck/tap/skate
+```
+
+### Binary download
+
+Download from [Releases](https://github.com/mobydeck/skate/releases), or build from source:
 
 ```bash
 git clone https://github.com/mobydeck/skate

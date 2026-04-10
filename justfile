@@ -51,8 +51,24 @@ checksums:
     sha256sum skate-* > checksums.txt
     cat checksums.txt
 
+# Compress a single binary with upx
+upx what compression="4":
+    upx -{{ compression }} {{ what }}
+
+# Compress linux binaries in dist with upx
+compress-linux compression="4":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for bin in {{ dist }}/skate-linux-*; do
+        [ -f "$bin" ] || continue
+        echo "Compressing ${bin}..."
+        upx -{{ compression }} "$bin"
+    done
+    echo "Done."
+    ls -lh {{ dist }}/skate-linux-*
+
 # Create draft GitHub release for current tag
-release: cross-build checksums
+release: cross-build compress-linux checksums
     #!/usr/bin/env bash
     set -euo pipefail
     tag="{{ version }}"
@@ -100,6 +116,39 @@ release: cross-build checksums
 # Clean build artifacts
 clean:
     rm -rf skate {{ dist }}
+
+# Generate Homebrew formula from dist binaries
+brew-formula: checksums
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tag="{{ version }}"
+    if [ "$tag" = "dev" ] || echo "$tag" | grep -q dirty; then
+        echo "Error: cannot generate formula from dev or dirty state."
+        exit 1
+    fi
+
+    template="Formula/skate.rb"
+    if [ ! -f "$template" ]; then
+        echo "Error: template not found at $template"
+        exit 1
+    fi
+
+    get_sha() {
+        grep "$1" {{ dist }}/checksums.txt | awk '{print $1}'
+    }
+
+    sha_darwin_arm64=$(get_sha "skate-darwin-arm64")
+    sha_linux_amd64=$(get_sha "skate-linux-amd64")
+    sha_linux_arm64=$(get_sha "skate-linux-arm64")
+
+    sed -e "s/VERSION/${tag}/g" \
+        -e "s/SHA256_DARWIN_ARM64/${sha_darwin_arm64}/g" \
+        -e "s/SHA256_LINUX_AMD64/${sha_linux_amd64}/g" \
+        -e "s/SHA256_LINUX_ARM64/${sha_linux_arm64}/g" \
+        "$template" > {{ dist }}/skate.rb
+
+    echo "Formula generated: {{ dist }}/skate.rb"
+    echo "Copy to your homebrew-tap repo: cp {{ dist }}/skate.rb /path/to/homebrew-tap/Formula/"
 
 # Lint
 lint:
