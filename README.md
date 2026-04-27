@@ -129,6 +129,9 @@ skate download <FILE_ID>              # Download a file (board from .skate.yaml)
 skate download <FILE_ID> -b <BOARD>   # Download from specific board
 skate find "search term"              # Search tasks by title and content
 skate find "bug" --json               # Search with JSON output
+skate next                            # Top-priority Not Started task (renders full task)
+skate next --mine                     # Top of queue limited to your assignments
+skate state                           # Snapshot: who you are, running timer, your in-progress tasks
 ```
 
 Task detail renders as markdown:
@@ -161,9 +164,15 @@ Total: 00:08
 ```bash
 skate create "Fix login bug" --status "Not Started" --priority "High"
 skate create "New feature" --description "Detailed description here"
+skate create "Triage failing job" --assignee arthur          # accepts username or user ID
 skate statuses                                    # list available statuses for the board
-skate update-status <TASK_ID> "In Progress"
+skate update <TASK_ID> --title "New title"        # rename a task
+skate update <TASK_ID> --priority "High"          # change priority
+skate update <TASK_ID> --assignee arthur          # reassign (username or user ID)
+skate update <TASK_ID> --status "In Progress" -t  # status + start timer
+skate update-status <TASK_ID> "In Progress"       # shortcut for --status
 skate update-status <TASK_ID> "In Progress" -t   # update status + start timer
+skate update-status <ID1> <ID2> <ID3> "Completed" # batch close (continues on failures)
 skate comment <TASK_ID> "Implemented the fix, running tests"
 skate add-content <TASK_ID> "Discovery: the API requires ..."   # text block (default)
 skate add-content <TASK_ID> "Architecture" -t h2               # heading block
@@ -171,6 +180,8 @@ skate add-content <TASK_ID> -t divider                         # divider block
 skate add-content <TASK_ID> "Review audit" -t checkbox         # checkbox block
 skate add-content <TASK_ID> ./diagram.png -t image             # inline image block
 skate attach <TASK_ID> ./screenshot.png
+skate edit-block <TASK_ID> <BLOCK_ID> "new text"               # rewrite a comment, content block, or heading
+skate delete-block <TASK_ID> <BLOCK_ID>                        # remove a wrong comment, content block, or attachment
 ```
 
 ### Time Tracking
@@ -197,6 +208,9 @@ skate time-add <TASK_ID> 02:00 --date 2026-04-01       # Backdate entry
 ```bash
 skate config                          # Show effective config (merged global + local + env)
 skate config --json                   # JSON output
+skate me                              # Show the authenticated Mattermost user
+skate users                           # List team members
+skate users arthur                    # Filter team members by username/name substring
 ```
 
 ### Output Formats
@@ -219,16 +233,25 @@ When connected via MCP, AI agents can use these tools:
 | `skate_help` | Get workflow guide (call this first) |
 | `skate_statuses` | List available statuses for the board |
 | `skate_boards` | List available boards |
-| `skate_tasks` | List tasks (default: active only, use `show_all` for all) |
-| `skate_task` | Get task details as markdown (all comments shown via MCP) |
-| `skate_update_status` | Change task status (optionally start timer with `start_timer`) |
-| `skate_create_task` | Create a new task |
+| `skate_tasks` | List tasks (default: active only; `show_all`, `mine`, `all_users` flags) |
+| `skate_next` | Pick the highest-priority Not Started task and return its full details |
+| `skate_state` | Session-resume snapshot: user, running timer, your In Progress tasks |
+| `skate_task` | Get task details as markdown (all comments shown via MCP; `no_translate` to skip translation) |
+| `skate_update_status` | Change one or many task statuses (`task_id` single or `task_ids` array; optional `start_timer` for single) |
+| `skate_update_task` | Update any of: title, icon, status, priority, assignee (optional `start_timer`) |
+| `skate_create_task` | Create a new task (`assignee` accepts a user ID) |
 | `skate_comment` | Add a comment to a task |
 | `skate_add_content` | Add a content block (text, h1-h3, divider, checkbox, image) |
-| `skate_comments` | Get all comments for a task |
+| `skate_attach` | Upload a local file and attach it to a task |
+| `skate_edit_block` | Rewrite a content block, comment, or heading in place |
+| `skate_delete_block` | Delete a content block, comment, or attachment by block ID |
+| `skate_download` | Download an attached file (inline for text, save to disk via `output_path` for binary) |
+| `skate_comments` | Get all comments for a task (`no_translate` to skip translation) |
 | `skate_task_files` | List files attached to a task |
 | `skate_find` | Search tasks by title and content |
 | `skate_config` | Show effective configuration (mentions, translate) |
+| `skate_me` | Show the authenticated Mattermost user (id, username) |
+| `skate_users` | List team members (optional `query` substring filter) |
 | `skate_timer_start` | Start timer on a task |
 | `skate_timer_stop` | Stop running timer with notes |
 | `skate_time_add` | Add manual time entry |

@@ -11,18 +11,18 @@ func TestRenderCardMarkdown_Basic(t *testing.T) {
 		ID:    "card-1",
 		Title: "Test Task",
 		Icon:  "🎯",
-		Properties: map[string]interface{}{
+		Properties: map[string]any{
 			"p1": "o1",
 		},
 	}
 	board := &Board{
-		CardProperties: []map[string]interface{}{
+		CardProperties: []map[string]any{
 			{
 				"id":   "p1",
 				"name": "Status",
 				"type": "select",
-				"options": []interface{}{
-					map[string]interface{}{"id": "o1", "value": "In Progress"},
+				"options": []any{
+					map[string]any{"id": "o1", "value": "In Progress"},
 				},
 			},
 		},
@@ -65,7 +65,7 @@ func TestRenderCardMarkdown_Attachments(t *testing.T) {
 	card := &Card{Title: "Test"}
 	board := &Board{}
 	blocks := []*Block{
-		{Type: "attachment", Title: "file.pdf", Fields: map[string]interface{}{"fileId": "f123"}},
+		{Type: "attachment", Title: "file.pdf", Fields: map[string]any{"fileId": "f123"}},
 	}
 
 	md := RenderCardMarkdown(card, board, blocks, nil, nil, nil)
@@ -83,7 +83,7 @@ func TestRenderCardMarkdown_InlineImage(t *testing.T) {
 	board := &Board{}
 	blocks := []*Block{
 		{Type: "text", Title: "Some text before"},
-		{Type: "image", Title: "screenshot.png", Fields: map[string]interface{}{"fileId": "img123"}},
+		{Type: "image", Title: "screenshot.png", Fields: map[string]any{"fileId": "img123"}},
 		{Type: "text", Title: "Some text after"},
 	}
 
@@ -202,12 +202,12 @@ func TestRenderCardMarkdown_CreatedBy(t *testing.T) {
 func TestRenderCardMarkdown_PersonProperty(t *testing.T) {
 	card := &Card{
 		Title: "Test",
-		Properties: map[string]interface{}{
+		Properties: map[string]any{
 			"p1": "user-id-1",
 		},
 	}
 	board := &Board{
-		CardProperties: []map[string]interface{}{
+		CardProperties: []map[string]any{
 			{
 				"id":   "p1",
 				"name": "Assignee",

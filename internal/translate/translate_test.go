@@ -62,8 +62,8 @@ func TestIsLikelyEnglish(t *testing.T) {
 		{"This is a test with some code: func main() {}", true},
 		{"", true},
 		{"123 456", true},
-		{"Привет мир", false},        // Russian
-		{"こんにちは世界", false},       // Japanese
+		{"Привет мир", false},          // Russian
+		{"こんにちは世界", false},             // Japanese
 		{"Mixed hello мир text", true}, // mostly ASCII
 		{"```\ncode block\n```", true}, // code only
 		{"this is a long english sentence with just one word мир in another language", true}, // >80% ASCII
@@ -101,10 +101,10 @@ func TestFormatProviderInfo(t *testing.T) {
 	}
 
 	cfg = config.TranslateConfig{
-		Enabled: true,
+		Enabled:  true,
 		Provider: "ollama",
-		Model:   "llama3",
-		BaseURL: "http://localhost:11434/v1",
+		Model:    "llama3",
+		BaseURL:  "http://localhost:11434/v1",
 	}
 	got = FormatProviderInfo(cfg)
 	if got != "ollama/llama3 (http://localhost:11434/v1)" {

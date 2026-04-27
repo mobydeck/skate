@@ -53,6 +53,13 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(findCmd)
 	rootCmd.AddCommand(statusesCmd)
+	rootCmd.AddCommand(meCmd)
+	rootCmd.AddCommand(deleteBlockCmd)
+	rootCmd.AddCommand(usersCmd)
+	rootCmd.AddCommand(updateCmd)
+	rootCmd.AddCommand(editBlockCmd)
+	rootCmd.AddCommand(nextCmd)
+	rootCmd.AddCommand(stateCmd)
 }
 
 func loadConfigAndService() (*config.Config, *boards.Service, error) {

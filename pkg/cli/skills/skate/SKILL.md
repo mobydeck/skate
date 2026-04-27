@@ -17,20 +17,22 @@ CLI users in a project with `.skate.yaml` do not need to worry about this.
 
 ## Before starting work
 
-1. List available tasks: `skate tasks` or `skate_tasks` (pass `board_id` if needed)
-2. Review task details before working: `skate task <ID>` or `skate_task` (shows last 5 comments; use `--full` for all)
+1. **Quick pick:** `skate next` (or `skate_next`, optionally `--mine`) returns the top-priority Not Started task with full details — saves the list+sort+pick round-trip when the user says "work on next task" or "pick the top task".
+2. Otherwise list available tasks: `skate tasks` or `skate_tasks` (pass `board_id` if needed)
+3. Review task details before working: `skate task <ID>` or `skate_task` (shows last 5 comments; use `--full` for all)
    - To see all comments only: `skate comments <ID>`
-3. **Check for attached files**: use `skate task-files <ID>` to list attachments. If the task has images, text, markdown, config files, or other readable files — download and review them before starting. They often contain essential context, screenshots of bugs, or reference material.
-   - Download: `skate download <FILE_ID> -o filename.ext`
-4. **Search for related tasks** if you need context: `skate find "keyword"` or `skate_find` MCP tool. Searches titles first, then content blocks and comments. Useful for finding prior work, related bugs, or duplicate tasks before starting.
-5. **Check available statuses first**: `skate statuses` or `skate_statuses`. Status names vary per board (e.g. "Completed 🙌" vs "Done") -- do NOT guess.
-6. Update status and start timer in one call: `skate update-status <ID> "In Progress" --timer` or `skate_update_status` with `start_timer: true`
+4. **Check for attached files**: use `skate task-files <ID>` or `skate_task_files`. If the task has images, text, markdown, config files, or other readable files — download and review them before starting. They often contain essential context, screenshots of bugs, or reference material.
+   - CLI: `skate download <FILE_ID> -o filename.ext`
+   - MCP: `skate_download` — text files come back inline; for binaries pass an absolute `output_path`.
+5. **Search for related tasks** if you need context: `skate find "keyword"` or `skate_find` MCP tool. Searches titles first, then content blocks and comments. Useful for finding prior work, related bugs, or duplicate tasks before starting.
+6. **Check available statuses first**: `skate statuses` or `skate_statuses`. Status names vary per board (e.g. "Completed 🙌" vs "Done") -- do NOT guess.
+7. Update status and start timer in one call: `skate update-status <ID> "In Progress" --timer` or `skate_update_status` with `start_timer: true`
 
 ## While working
 
 - Add progress comments: `skate comment <ID> "Implemented feature X"` or `skate_comment`
 - Create sub-tasks if needed: `skate create "Sub-task title"` or `skate_create_task`
-- **Attach files** to preserve context: `skate attach <ID> <file>`. Use this for test output, logs, generated configs, screenshots, or any artifact that helps the team (or future agents) understand what happened. Attachments are especially valuable for large outputs that would clutter a comment.
+- **Attach files** to preserve context: `skate attach <ID> <file>` or `skate_attach` MCP tool (pass an absolute `file_path` to avoid working-directory issues). Use this for test output, logs, generated configs, screenshots, or any artifact that helps the team (or future agents) understand what happened. Attachments are especially valuable for large outputs that would clutter a comment.
 
 ## Content blocks vs comments
 
@@ -49,6 +51,10 @@ skate add-content <ID> "Review security audit" -t checkbox # checkbox item
 skate add-content <ID> ./diagram.png -t image              # inline image (uploads file)
 ```
 MCP: `skate_add_content` with `block_type` parameter (text, h1, h2, h3, divider, checkbox, image). For image, pass the **absolute** file path as `text` to avoid working directory issues.
+
+**Fixing mistakes:** wrong comment, outdated content block, or accidental attachment? Find the block ID via `skate task <ID> --json` (look at `blocks[]`) or `skate task-files <ID>` for attachments. To rewrite in place: `skate edit-block <TASK_ID> <BLOCK_ID> "new text"` or `skate_edit_block` MCP tool. To remove entirely: `skate delete-block <TASK_ID> <BLOCK_ID>` or `skate_delete_block`. Delete cleans up the card's content order automatically.
+
+**Renaming, reassigning, re-prioritizing:** use `skate update <ID> --title ... --priority ... --assignee ... --icon ...` (CLI) or `skate_update_task` (MCP). `update-status` is a shortcut for the status-only case.
 
 **When to add content blocks:**
 - You discovered something non-obvious about the code while working on a task
@@ -73,6 +79,7 @@ By default, mention the last relevant person when adding comments — this notif
 - If no comments exist yet: mention the **task creator** (shown in task detail output)
 - If comments exist: mention the **last commenter** (the most recent comment author)
 - Only mention **one person** — the last relevant one, not everyone
+- It is fine — and often desired — to mention the same Mattermost user this token is authenticated as. Agents commonly share an account with their human operator, so the @-mention is what triggers the operator's Mattermost/email notification. Use `skate me` (or `skate_me`) to confirm the authenticated user when relevant; don't suppress mentions just because the names match.
 
 **Example:**
 ```

@@ -38,6 +38,44 @@ func (s *Service) GetMe() (*User, error) {
 	return &user, nil
 }
 
+func (s *Service) ListUsers(teamID string) ([]*User, error) {
+	data, err := s.client.Get("/teams/" + teamID + "/users")
+	if err != nil {
+		return nil, err
+	}
+	var users []*User
+	if err := json.Unmarshal(data, &users); err != nil {
+		return nil, fmt.Errorf("parsing users: %w", err)
+	}
+	return users, nil
+}
+
+// ResolveUserRef returns a user ID for a reference that is either an existing
+// user ID or a username. Lookup is case-insensitive on username. Returns the
+// raw ref unchanged if no users match — the caller decides whether to treat
+// that as an error or as a pre-resolved ID.
+func (s *Service) ResolveUserRef(teamID, ref string) (string, error) {
+	if ref == "" {
+		return "", nil
+	}
+	users, err := s.ListUsers(teamID)
+	if err != nil {
+		return ref, err
+	}
+	lower := strings.ToLower(ref)
+	for _, u := range users {
+		if u.ID == ref {
+			return u.ID, nil
+		}
+	}
+	for _, u := range users {
+		if strings.ToLower(u.Username) == lower {
+			return u.ID, nil
+		}
+	}
+	return ref, fmt.Errorf("no user matches %q (try 'skate users' to list)", ref)
+}
+
 func (s *Service) ListBoards() ([]*Board, error) {
 	data, err := s.client.Get("/teams/" + s.teamID + "/boards")
 	if err != nil {
@@ -179,6 +217,85 @@ func (s *Service) CreateContentBlock(boardID, cardID string, block *Block) (*Blo
 	return created[0], nil
 }
 
+// UpdateBlockTitle PATCHes a block's title (the body text for text/comment
+// blocks, the heading for h1-h3, the filename for attachments). Other block
+// fields are unchanged.
+func (s *Service) UpdateBlockTitle(boardID, blockID, title string) error {
+	payload := map[string]any{"title": title}
+	_, err := s.client.Patch("/boards/"+boardID+"/blocks/"+blockID, payload)
+	return err
+}
+
+// DeleteBlock removes a block (content, comment, or attachment) from a board.
+// If cardID is non-empty and the block was a content block, the card's
+// contentOrder is patched to drop the deleted ID so the web UI doesn't show a
+// phantom slot.
+func (s *Service) DeleteBlock(boardID, cardID, blockID string) error {
+	if _, err := s.client.Delete("/boards/" + boardID + "/blocks/" + blockID); err != nil {
+		return err
+	}
+	if cardID == "" {
+		return nil
+	}
+	card, err := s.GetCard(cardID)
+	if err != nil {
+		return nil // block deleted; contentOrder cleanup is best-effort
+	}
+	newOrder, changed := removeFromContentOrder(card.ContentOrder, blockID)
+	if changed {
+		s.PatchCard(cardID, &CardPatch{ContentOrder: newOrder})
+	}
+	return nil
+}
+
+// removeFromContentOrder strips blockID from a card's contentOrder, preserving
+// the nested-row structure Focalboard supports. Returns (newOrder, changed).
+func removeFromContentOrder(order []any, blockID string) ([]any, bool) {
+	out := make([]any, 0, len(order))
+	changed := false
+	for _, e := range order {
+		switch v := e.(type) {
+		case string:
+			if v == blockID {
+				changed = true
+				continue
+			}
+			out = append(out, v)
+		case []any:
+			row := make([]any, 0, len(v))
+			for _, inner := range v {
+				if s, ok := inner.(string); ok && s == blockID {
+					changed = true
+					continue
+				}
+				row = append(row, inner)
+			}
+			if len(row) > 0 {
+				out = append(out, row)
+			} else {
+				changed = true // dropped an empty row
+			}
+		case []string:
+			row := make([]string, 0, len(v))
+			for _, s := range v {
+				if s == blockID {
+					changed = true
+					continue
+				}
+				row = append(row, s)
+			}
+			if len(row) > 0 {
+				out = append(out, row)
+			} else {
+				changed = true
+			}
+		default:
+			out = append(out, e)
+		}
+	}
+	return out, changed
+}
+
 func (s *Service) UploadFile(teamID, boardID, filePath string) (string, error) {
 	data, err := s.client.Upload("/teams/"+teamID+"/"+boardID+"/files", filePath)
 	if err != nil {
@@ -236,7 +353,7 @@ func (s *Service) GetRunningTimer() (*TimeEntry, error) {
 }
 
 func (s *Service) AddManualTime(boardID, cardID string, durationSeconds, date int64, notes string) (*TimeEntry, error) {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"durationSeconds": durationSeconds,
 		"date":            date,
 		"notes":           notes,
@@ -274,9 +391,9 @@ func ParsePropertyDefs(board *Board) []PropertyDef {
 			Name: getString(raw, "name"),
 			Type: getString(raw, "type"),
 		}
-		if opts, ok := raw["options"].([]interface{}); ok {
+		if opts, ok := raw["options"].([]any); ok {
 			for i, o := range opts {
-				if om, ok := o.(map[string]interface{}); ok {
+				if om, ok := o.(map[string]any); ok {
 					def.Options = append(def.Options, PropertyOption{
 						ID:    getString(om, "id"),
 						Value: getString(om, "value"),
@@ -311,7 +428,7 @@ func FindOptionByValue(def *PropertyDef, value string) *PropertyOption {
 	return nil
 }
 
-func ResolvePropertyValue(defs []PropertyDef, propID string, rawValue interface{}) string {
+func ResolvePropertyValue(defs []PropertyDef, propID string, rawValue any) string {
 	if rawValue == nil {
 		return ""
 	}
@@ -361,6 +478,24 @@ func ResolveCards(cards []*Card, defs []PropertyDef) []ResolvedCard {
 	return resolved
 }
 
+// FilterMine keeps only cards whose Assignee matches the given user.
+// Matches user ID, exact username, or username substring (case-insensitive)
+// to handle multi-assignee fields that store joined names.
+func FilterMine(cards []ResolvedCard, me *User) []ResolvedCard {
+	if me == nil {
+		return cards
+	}
+	username := strings.ToLower(me.Username)
+	out := make([]ResolvedCard, 0, len(cards))
+	for _, rc := range cards {
+		if rc.Assignee == me.ID || rc.Assignee == me.Username ||
+			(username != "" && strings.Contains(strings.ToLower(rc.Assignee), username)) {
+			out = append(out, rc)
+		}
+	}
+	return out
+}
+
 func SortByPriority(cards []ResolvedCard) {
 	priorityOrder := map[string]int{
 		"urgent": 0, "1. high": 1, "high": 1,
@@ -392,7 +527,7 @@ func FormatTimestamp(millis int64) string {
 	return time.UnixMilli(millis).Format("Jan 2, 2006 15:04")
 }
 
-func getString(m map[string]interface{}, key string) string {
+func getString(m map[string]any, key string) string {
 	if v, ok := m[key]; ok {
 		if s, ok := v.(string); ok {
 			return s

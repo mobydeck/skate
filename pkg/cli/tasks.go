@@ -84,17 +84,8 @@ var tasksCmd = &cobra.Command{
 		}
 
 		if onlyMine {
-			me, err := svc.GetMe()
-			if err == nil && me != nil {
-				var filtered []boards.ResolvedCard
-				for _, rc := range resolved {
-					// Check if assignee matches current user ID or username
-					if rc.Assignee == me.ID || rc.Assignee == me.Username ||
-						strings.Contains(strings.ToLower(rc.Assignee), strings.ToLower(me.Username)) {
-						filtered = append(filtered, rc)
-					}
-				}
-				resolved = filtered
+			if me, err := svc.GetMe(); err == nil {
+				resolved = boards.FilterMine(resolved, me)
 			}
 		}
 

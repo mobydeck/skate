@@ -1,58 +1,58 @@
 package boards
 
 type Board struct {
-	ID             string                   `json:"id"`
-	TeamID         string                   `json:"teamId"`
-	ChannelID      string                   `json:"channelId,omitempty"`
-	CreatedBy      string                   `json:"createdBy"`
-	ModifiedBy     string                   `json:"modifiedBy"`
-	Type           string                   `json:"type"`
-	MinimumRole    string                   `json:"minimumRole"`
-	Title          string                   `json:"title"`
-	Description    string                   `json:"description"`
-	Icon           string                   `json:"icon"`
-	IsTemplate     bool                     `json:"isTemplate"`
-	CardProperties []map[string]interface{} `json:"cardProperties"`
-	CreateAt       int64                    `json:"createAt"`
-	UpdateAt       int64                    `json:"updateAt"`
-	DeleteAt       int64                    `json:"deleteAt"`
+	ID             string           `json:"id"`
+	TeamID         string           `json:"teamId"`
+	ChannelID      string           `json:"channelId,omitempty"`
+	CreatedBy      string           `json:"createdBy"`
+	ModifiedBy     string           `json:"modifiedBy"`
+	Type           string           `json:"type"`
+	MinimumRole    string           `json:"minimumRole"`
+	Title          string           `json:"title"`
+	Description    string           `json:"description"`
+	Icon           string           `json:"icon"`
+	IsTemplate     bool             `json:"isTemplate"`
+	CardProperties []map[string]any `json:"cardProperties"`
+	CreateAt       int64            `json:"createAt"`
+	UpdateAt       int64            `json:"updateAt"`
+	DeleteAt       int64            `json:"deleteAt"`
 }
 
 type Card struct {
-	ID           string                 `json:"id"`
-	BoardID      string                 `json:"boardId"`
-	CreatedBy    string                 `json:"createdBy"`
-	ModifiedBy   string                 `json:"modifiedBy"`
-	Title        string                 `json:"title"`
-	ContentOrder []any                  `json:"contentOrder"`
-	Icon         string                 `json:"icon"`
-	IsTemplate   bool                   `json:"isTemplate"`
-	Properties   map[string]interface{} `json:"properties"`
-	CreateAt     int64                  `json:"createAt"`
-	UpdateAt     int64                  `json:"updateAt"`
-	DeleteAt     int64                  `json:"deleteAt"`
+	ID           string         `json:"id"`
+	BoardID      string         `json:"boardId"`
+	CreatedBy    string         `json:"createdBy"`
+	ModifiedBy   string         `json:"modifiedBy"`
+	Title        string         `json:"title"`
+	ContentOrder []any          `json:"contentOrder"`
+	Icon         string         `json:"icon"`
+	IsTemplate   bool           `json:"isTemplate"`
+	Properties   map[string]any `json:"properties"`
+	CreateAt     int64          `json:"createAt"`
+	UpdateAt     int64          `json:"updateAt"`
+	DeleteAt     int64          `json:"deleteAt"`
 }
 
 type CardPatch struct {
-	Title             *string                `json:"title,omitempty"`
-	Icon              *string                `json:"icon,omitempty"`
-	ContentOrder      []any                  `json:"contentOrder,omitempty"`
-	UpdatedProperties map[string]interface{} `json:"updatedProperties,omitempty"`
+	Title             *string        `json:"title,omitempty"`
+	Icon              *string        `json:"icon,omitempty"`
+	ContentOrder      []any          `json:"contentOrder,omitempty"`
+	UpdatedProperties map[string]any `json:"updatedProperties,omitempty"`
 }
 
 type Block struct {
-	ID         string                 `json:"id"`
-	ParentID   string                 `json:"parentId"`
-	CreatedBy  string                 `json:"createdBy"`
-	ModifiedBy string                 `json:"modifiedBy"`
-	Schema     int64                  `json:"schema"`
-	Type       string                 `json:"type"`
-	Title      string                 `json:"title"`
-	Fields     map[string]interface{} `json:"fields"`
-	CreateAt   int64                  `json:"createAt"`
-	UpdateAt   int64                  `json:"updateAt"`
-	DeleteAt   int64                  `json:"deleteAt"`
-	BoardID    string                 `json:"boardId"`
+	ID         string         `json:"id"`
+	ParentID   string         `json:"parentId"`
+	CreatedBy  string         `json:"createdBy"`
+	ModifiedBy string         `json:"modifiedBy"`
+	Schema     int64          `json:"schema"`
+	Type       string         `json:"type"`
+	Title      string         `json:"title"`
+	Fields     map[string]any `json:"fields"`
+	CreateAt   int64          `json:"createAt"`
+	UpdateAt   int64          `json:"updateAt"`
+	DeleteAt   int64          `json:"deleteAt"`
+	BoardID    string         `json:"boardId"`
 }
 
 type TimeEntry struct {

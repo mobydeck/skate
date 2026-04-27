@@ -31,7 +31,7 @@ var createCmd = &cobra.Command{
 		}
 
 		defs := boards.ParsePropertyDefs(board)
-		props := make(map[string]interface{})
+		props := make(map[string]any)
 
 		// Set status if provided
 		if status, _ := cmd.Flags().GetString("status"); status != "" {
@@ -53,14 +53,19 @@ var createCmd = &cobra.Command{
 			}
 		}
 
-		// Set assignee if provided
+		// Set assignee if provided. Accepts either a user ID or a username
+		// (resolved against the team listing).
 		if assignee, _ := cmd.Flags().GetString("assignee"); assignee != "" {
 			p := boards.FindPropertyByName(defs, "Assignee")
 			if p == nil {
 				p = boards.FindPropertyByName(defs, "Assignees")
 			}
 			if p != nil {
-				props[p.ID] = assignee
+				resolved, err := svc.ResolveUserRef(cfg.TeamID, assignee)
+				if err != nil {
+					return fmt.Errorf("resolving assignee: %w", err)
+				}
+				props[p.ID] = resolved
 			}
 		}
 

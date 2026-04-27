@@ -111,7 +111,7 @@ func addImageBlock(cfg *config.Config, svc *boards.Service, cardID, filePath str
 		BoardID:  card.BoardID,
 		Type:     "image",
 		Title:    filepath.Base(filePath),
-		Fields:   map[string]interface{}{"fileId": fileID},
+		Fields:   map[string]any{"fileId": fileID},
 		CreateAt: now,
 		UpdateAt: now,
 	}

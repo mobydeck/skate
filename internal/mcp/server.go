@@ -3,9 +3,11 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -65,16 +67,22 @@ Skate connects to Mattermost Boards. Follow this workflow:
 
 ## Starting a task
 1. skate_boards — get available boards and their IDs
-2. skate_tasks — list active tasks (pass board_id if needed)
-3. skate_task — read full task details (description, comments, attachments)
-4. skate_task_files — check for attached files, download if relevant
-5. skate_find — search for related tasks by keyword (pass board_id if needed)
-6. skate_statuses — check available statuses for the board (pass board_id if needed)
-7. skate_update_status — set "In Progress" with start_timer: true
+2. skate_next — shortcut: pick the top-priority Not Started task and return its full details (one call instead of list+sort+pick+task)
+3. skate_tasks — list active tasks (pass board_id if needed)
+4. skate_task — read full task details (description, comments, attachments)
+5. skate_task_files — check for attached files
+6. skate_download — fetch any attached files worth reading (text inline, or save with output_path)
+7. skate_find — search for related tasks by keyword (pass board_id if needed)
+8. skate_statuses — check available statuses for the board (pass board_id if needed)
+9. skate_update_status — set "In Progress" with start_timer: true
 
 ## While working
 - skate_comment — add progress comments (mention @last_commenter, append signature)
 - skate_add_content — add persistent notes to the task description
+- skate_attach — upload a local file (logs, configs, screenshots, plan docs) and attach it to the task
+- skate_edit_block — rewrite a comment, content block, or heading in place
+- skate_delete_block — fix a mistake: remove a wrong comment, content block, or attachment by block_id
+- skate_update_task — change title, icon, status, priority, or assignee on an existing task (general form of skate_update_status)
 - skate_create_task — create new tasks (pass board_id if needed)
 
 ## Finishing
@@ -86,6 +94,9 @@ Skate connects to Mattermost Boards. Follow this workflow:
 - Always mention the last relevant person: @username at start of comment
 - Always sign comments: — agent-name (model-name)
 - Check skate_config for mentions and translate settings
+- Call skate_me to know which user this server is authenticated as. Mentioning that same user is fine — agents often share an account with their operator, and the @-mention is what delivers the notification. Don't suppress a mention just because the names match.
+- Use skate_users to look up a username before calling skate_create_task with assignee — assignee fields accept a username or a raw user ID
+- Resuming a session? Call skate_state once to see your running timer and In Progress tasks before doing anything else
 
 ## IMPORTANT: Statuses vary per board
 Call skate_statuses BEFORE updating status to see valid values for the current board.
@@ -154,9 +165,11 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"board_id": map[string]any{"type": "string", "description": "Board ID (optional, uses default from config)"},
-				"status":   map[string]any{"type": "string", "description": "Filter by specific status (optional)"},
-				"show_all": map[string]any{"type": "boolean", "description": "Show all tasks regardless of status (default: false)"},
+				"board_id":  map[string]any{"type": "string", "description": "Board ID (optional, uses default from config)"},
+				"status":    map[string]any{"type": "string", "description": "Filter by specific status (optional)"},
+				"show_all":  map[string]any{"type": "boolean", "description": "Show all tasks regardless of status (default: false)"},
+				"mine":      map[string]any{"type": "boolean", "description": "Show only tasks assigned to the authenticated user (overrides config)"},
+				"all_users": map[string]any{"type": "boolean", "description": "Show tasks for all users (overrides only_mine config)"},
 			},
 		},
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
@@ -204,6 +217,20 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 			resolved = filtered
 		}
 
+		// Assignee filtering — mirrors CLI flags. Explicit params win over config.
+		onlyMine := cfg.OnlyMine
+		if mine, ok := input["mine"].(bool); ok && mine {
+			onlyMine = true
+		}
+		if allUsers, ok := input["all_users"].(bool); ok && allUsers {
+			onlyMine = false
+		}
+		if onlyMine {
+			if me, err := svc.GetMe(); err == nil {
+				resolved = boards.FilterMine(resolved, me)
+			}
+		}
+
 		var lines []string
 		for _, rc := range resolved {
 			lines = append(lines, fmt.Sprintf("- [%s] %s | Status: %s | Priority: %s | Assignee: %s",
@@ -215,6 +242,76 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 		return textResult(strings.Join(lines, "\n")), nil, nil
 	})
 
+	// skate_next
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_next",
+		Description: "Pick the highest-priority Not Started task and return its full details. Use when the user says 'pick next task' or 'work on the top task' — saves the list+sort+pick round-trip.",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"board_id":     map[string]any{"type": "string", "description": "Board ID (optional, uses default from config)"},
+				"mine":         map[string]any{"type": "boolean", "description": "Only consider tasks assigned to the authenticated user"},
+				"no_translate": map[string]any{"type": "boolean", "description": "Skip translation even if enabled in config (default: false)"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
+		boardID := getStr(input, "board_id")
+		if boardID == "" {
+			boardID = cfg.BoardID
+		}
+		if boardID == "" {
+			return errResult(fmt.Errorf("board_id required")), nil, nil
+		}
+
+		board, err := svc.GetBoard(boardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		cards, err := svc.ListCards(boardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+
+		defs := boards.ParsePropertyDefs(board)
+		resolved := boards.ResolveCards(cards, defs)
+		boards.SortByPriority(resolved)
+
+		var queue []boards.ResolvedCard
+		for _, rc := range resolved {
+			if strings.EqualFold(rc.Status, "Not Started") {
+				queue = append(queue, rc)
+			}
+		}
+		if mine, _ := input["mine"].(bool); mine {
+			if me, err := svc.GetMe(); err == nil {
+				queue = boards.FilterMine(queue, me)
+			}
+		}
+
+		if len(queue) == 0 {
+			return textResult("No tasks ready to start."), nil, nil
+		}
+
+		top := queue[0]
+		card, err := svc.GetCard(top.ID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		blocks, err := svc.GetBlocks(boardID, top.ID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		summaries, _ := svc.GetTimeSummary(boardID, top.ID)
+		uc := boards.NewUserCache(svc)
+		defer uc.Flush()
+		var tr *translate.Translator
+		if noTr, _ := input["no_translate"].(bool); !noTr {
+			tr = translate.New(cfg.Translate)
+		}
+		md := boards.RenderCardMarkdown(card, board, blocks, summaries, uc, tr)
+		return textResult(md), nil, nil
+	})
+
 	// skate_task
 	mcpsdk.AddTool(s, &mcpsdk.Tool{
 		Name:        "skate_task",
@@ -223,7 +320,8 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 			"type":     "object",
 			"required": []string{"task_id"},
 			"properties": map[string]any{
-				"task_id": map[string]any{"type": "string", "description": "Task/card ID"},
+				"task_id":      map[string]any{"type": "string", "description": "Task/card ID"},
+				"no_translate": map[string]any{"type": "boolean", "description": "Skip translation even if enabled in config (default: false)"},
 			},
 		},
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
@@ -243,7 +341,10 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 		summaries, _ := svc.GetTimeSummary(card.BoardID, cardID)
 		uc := boards.NewUserCache(svc)
 		defer uc.Flush()
-		tr := translate.New(cfg.Translate)
+		var tr *translate.Translator
+		if noTr, _ := input["no_translate"].(bool); !noTr {
+			tr = translate.New(cfg.Translate)
+		}
 		md := boards.RenderCardMarkdown(card, board, blocks, summaries, uc, tr)
 		return textResult(md), nil, nil
 	})
@@ -251,26 +352,44 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 	// skate_update_status
 	mcpsdk.AddTool(s, &mcpsdk.Tool{
 		Name:        "skate_update_status",
-		Description: "Change a task's status. Optionally start a timer in the same call.",
+		Description: "Change one or more tasks' status. Pass task_id for a single task, or task_ids for a batch. start_timer is single-task only. Batch failures continue and are reported per task.",
 		InputSchema: map[string]any{
 			"type":     "object",
-			"required": []string{"task_id", "status"},
+			"required": []string{"status"},
 			"properties": map[string]any{
-				"task_id":     map[string]any{"type": "string", "description": "Task/card ID"},
+				"task_id":     map[string]any{"type": "string", "description": "Single task/card ID (use task_ids for batch)"},
+				"task_ids":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Multiple task/card IDs to update at once"},
 				"status":      map[string]any{"type": "string", "description": "New status value"},
-				"start_timer": map[string]any{"type": "boolean", "description": "Start timer after updating status (default: false)"},
+				"start_timer": map[string]any{"type": "boolean", "description": "Start timer after updating (single-task only; default: false)"},
 			},
 		},
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
-		cardID := getStr(input, "task_id")
 		status := getStr(input, "status")
 		startTimer, _ := input["start_timer"].(bool)
 
-		card, err := svc.GetCard(cardID)
+		var cardIDs []string
+		if raw, ok := input["task_ids"].([]any); ok {
+			for _, v := range raw {
+				if s, ok := v.(string); ok && s != "" {
+					cardIDs = append(cardIDs, s)
+				}
+			}
+		}
+		if id := getStr(input, "task_id"); id != "" {
+			cardIDs = append(cardIDs, id)
+		}
+		if len(cardIDs) == 0 {
+			return errResult(fmt.Errorf("task_id or task_ids required")), nil, nil
+		}
+		if len(cardIDs) > 1 && startTimer {
+			return errResult(fmt.Errorf("start_timer is only supported for single-task updates")), nil, nil
+		}
+
+		first, err := svc.GetCard(cardIDs[0])
 		if err != nil {
 			return errResult(err), nil, nil
 		}
-		board, err := svc.GetBoard(card.BoardID)
+		board, err := svc.GetBoard(first.BoardID)
 		if err != nil {
 			return errResult(err), nil, nil
 		}
@@ -283,12 +402,139 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 		if option == nil {
 			return errResult(fmt.Errorf("invalid status %q", status)), nil, nil
 		}
-		patch := &boards.CardPatch{UpdatedProperties: map[string]interface{}{statusProp.ID: option.ID}}
-		if _, err := svc.PatchCard(cardID, patch); err != nil {
-			return errResult(err), nil, nil
+		patch := &boards.CardPatch{UpdatedProperties: map[string]any{statusProp.ID: option.ID}}
+
+		var lines, failed []string
+		for _, id := range cardIDs {
+			if _, err := svc.PatchCard(id, patch); err != nil {
+				failed = append(failed, fmt.Sprintf("%s: %v", id, err))
+				continue
+			}
+			lines = append(lines, fmt.Sprintf("%s → %q", id, option.Value))
 		}
 
-		msg := fmt.Sprintf("Status updated to %q", option.Value)
+		if startTimer {
+			resp, err := svc.StartTimer(first.BoardID, cardIDs[0])
+			if err != nil {
+				lines = append(lines, "Time tracking is not available on this Mattermost instance.")
+			} else {
+				lines = append(lines, fmt.Sprintf("Timer started on: %s", first.Title))
+				if resp.StoppedEntry != nil {
+					lines = append(lines, fmt.Sprintf("Auto-stopped previous timer on: %s (%s)", resp.StoppedEntry.CardName, resp.StoppedEntry.DurationDisplay))
+				}
+			}
+		}
+
+		if len(failed) > 0 {
+			lines = append(lines, fmt.Sprintf("\n%d of %d failed:", len(failed), len(cardIDs)))
+			for _, f := range failed {
+				lines = append(lines, "  "+f)
+			}
+		}
+		return textResult(strings.Join(lines, "\n")), nil, nil
+	})
+
+	// skate_update_task
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_update_task",
+		Description: "Update one or more fields on a task (title, icon, status, priority, assignee). Generalizes skate_update_status. Only the fields you pass are changed.",
+		InputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"task_id"},
+			"properties": map[string]any{
+				"task_id":     map[string]any{"type": "string", "description": "Task/card ID"},
+				"title":       map[string]any{"type": "string", "description": "New title"},
+				"icon":        map[string]any{"type": "string", "description": "New icon (emoji)"},
+				"status":      map[string]any{"type": "string", "description": "New status — call skate_statuses for valid values"},
+				"priority":    map[string]any{"type": "string", "description": "New priority"},
+				"assignee":    map[string]any{"type": "string", "description": "Assignee — username (resolved via skate_users) or raw user ID"},
+				"start_timer": map[string]any{"type": "boolean", "description": "Start timer after updating (default: false)"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
+		cardID := getStr(input, "task_id")
+		if cardID == "" {
+			return errResult(fmt.Errorf("task_id required")), nil, nil
+		}
+
+		card, err := svc.GetCard(cardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		board, err := svc.GetBoard(card.BoardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		defs := boards.ParsePropertyDefs(board)
+
+		patch := &boards.CardPatch{}
+		var changes []string
+
+		if v, ok := input["title"].(string); ok && v != "" {
+			patch.Title = &v
+			changes = append(changes, fmt.Sprintf("title=%q", v))
+		}
+		if v, ok := input["icon"].(string); ok && v != "" {
+			patch.Icon = &v
+			changes = append(changes, fmt.Sprintf("icon=%q", v))
+		}
+
+		props := map[string]any{}
+		if status := getStr(input, "status"); status != "" {
+			p := boards.FindPropertyByName(defs, "Status")
+			if p == nil {
+				return errResult(fmt.Errorf("board has no Status property")), nil, nil
+			}
+			o := boards.FindOptionByValue(p, status)
+			if o == nil {
+				return errResult(fmt.Errorf("invalid status %q", status)), nil, nil
+			}
+			props[p.ID] = o.ID
+			changes = append(changes, fmt.Sprintf("status=%q", status))
+		}
+		if priority := getStr(input, "priority"); priority != "" {
+			p := boards.FindPropertyByName(defs, "Priority")
+			if p == nil {
+				return errResult(fmt.Errorf("board has no Priority property")), nil, nil
+			}
+			o := boards.FindOptionByValue(p, priority)
+			if o == nil {
+				return errResult(fmt.Errorf("invalid priority %q", priority)), nil, nil
+			}
+			props[p.ID] = o.ID
+			changes = append(changes, fmt.Sprintf("priority=%q", priority))
+		}
+		if assignee := getStr(input, "assignee"); assignee != "" {
+			p := boards.FindPropertyByName(defs, "Assignee")
+			if p == nil {
+				p = boards.FindPropertyByName(defs, "Assignees")
+			}
+			if p == nil {
+				return errResult(fmt.Errorf("board has no Assignee property")), nil, nil
+			}
+			resolved, err := svc.ResolveUserRef(cfg.TeamID, assignee)
+			if err != nil {
+				return errResult(fmt.Errorf("resolving assignee: %w", err)), nil, nil
+			}
+			props[p.ID] = resolved
+			changes = append(changes, fmt.Sprintf("assignee=%q", assignee))
+		}
+		if len(props) > 0 {
+			patch.UpdatedProperties = props
+		}
+
+		startTimer, _ := input["start_timer"].(bool)
+		if patch.Title == nil && patch.Icon == nil && len(patch.UpdatedProperties) == 0 && !startTimer {
+			return errResult(fmt.Errorf("nothing to update — pass at least one of title/icon/status/priority/assignee/start_timer")), nil, nil
+		}
+
+		if patch.Title != nil || patch.Icon != nil || len(patch.UpdatedProperties) > 0 {
+			if _, err := svc.PatchCard(cardID, patch); err != nil {
+				return errResult(err), nil, nil
+			}
+		}
+
+		msg := fmt.Sprintf("Updated %s: %s", cardID, strings.Join(changes, ", "))
 		if startTimer {
 			resp, err := svc.StartTimer(card.BoardID, cardID)
 			if err != nil {
@@ -315,6 +561,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				"board_id":    map[string]any{"type": "string", "description": "Board ID (optional)"},
 				"status":      map[string]any{"type": "string", "description": "Initial status"},
 				"priority":    map[string]any{"type": "string", "description": "Priority level"},
+				"assignee":    map[string]any{"type": "string", "description": "Assignee — username (resolved via skate_users) or raw user ID"},
 				"description": map[string]any{"type": "string", "description": "Task description"},
 			},
 		},
@@ -332,7 +579,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 			return errResult(err), nil, nil
 		}
 		defs := boards.ParsePropertyDefs(board)
-		props := make(map[string]interface{})
+		props := make(map[string]any)
 
 		if s := getStr(input, "status"); s != "" {
 			if p := boards.FindPropertyByName(defs, "Status"); p != nil {
@@ -346,6 +593,19 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				if o := boards.FindOptionByValue(p, s); o != nil {
 					props[p.ID] = o.ID
 				}
+			}
+		}
+		if s := getStr(input, "assignee"); s != "" {
+			p := boards.FindPropertyByName(defs, "Assignee")
+			if p == nil {
+				p = boards.FindPropertyByName(defs, "Assignees")
+			}
+			if p != nil {
+				resolved, err := svc.ResolveUserRef(cfg.TeamID, s)
+				if err != nil {
+					return errResult(fmt.Errorf("resolving assignee: %w", err)), nil, nil
+				}
+				props[p.ID] = resolved
 			}
 		}
 
@@ -443,7 +703,7 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 				BoardID:  card.BoardID,
 				Type:     "image",
 				Title:    text,
-				Fields:   map[string]interface{}{"fileId": fileID},
+				Fields:   map[string]any{"fileId": fileID},
 				CreateAt: now,
 				UpdateAt: now,
 			}
@@ -477,6 +737,158 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 			return errResult(err), nil, nil
 		}
 		return textResult(fmt.Sprintf("Content block added (%s).", blockType)), nil, nil
+	})
+
+	// skate_edit_block
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_edit_block",
+		Description: "Replace the text of a content block, comment, or heading. For h1/h2/h3 headings, include the markdown prefix in text. Find block IDs via skate_task (json).",
+		InputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"task_id", "block_id", "text"},
+			"properties": map[string]any{
+				"task_id":  map[string]any{"type": "string", "description": "Task/card ID the block belongs to"},
+				"block_id": map[string]any{"type": "string", "description": "Block ID to edit"},
+				"text":     map[string]any{"type": "string", "description": "New block text"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
+		cardID := getStr(input, "task_id")
+		blockID := getStr(input, "block_id")
+		text := getStr(input, "text")
+		if blockID == "" {
+			return errResult(fmt.Errorf("block_id required")), nil, nil
+		}
+
+		card, err := svc.GetCard(cardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		if err := svc.UpdateBlockTitle(card.BoardID, blockID, text); err != nil {
+			return errResult(fmt.Errorf("editing block: %w", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Edited block %s", blockID)), nil, nil
+	})
+
+	// skate_delete_block
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_delete_block",
+		Description: "Delete a single block (content, comment, or attachment) from a task. Use to fix mistakes — e.g. removing a wrong comment or an outdated content block. Find block IDs via skate_task (json) or skate_task_files.",
+		InputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"task_id", "block_id"},
+			"properties": map[string]any{
+				"task_id":  map[string]any{"type": "string", "description": "Task/card ID the block belongs to"},
+				"block_id": map[string]any{"type": "string", "description": "Block ID to delete"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
+		cardID := getStr(input, "task_id")
+		blockID := getStr(input, "block_id")
+		if blockID == "" {
+			return errResult(fmt.Errorf("block_id required")), nil, nil
+		}
+
+		card, err := svc.GetCard(cardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		if err := svc.DeleteBlock(card.BoardID, cardID, blockID); err != nil {
+			return errResult(fmt.Errorf("deleting block: %w", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Deleted block %s", blockID)), nil, nil
+	})
+
+	// skate_attach
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_attach",
+		Description: "Upload a local file and attach it to a task. Use for logs, configs, screenshots, generated artifacts, or plan documents that should travel with the task.",
+		InputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"task_id", "file_path"},
+			"properties": map[string]any{
+				"task_id":   map[string]any{"type": "string", "description": "Task/card ID"},
+				"file_path": map[string]any{"type": "string", "description": "Absolute path to the local file to upload. Use absolute paths to avoid working-directory issues."},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
+		cardID := getStr(input, "task_id")
+		filePath := getStr(input, "file_path")
+		if filePath == "" {
+			return errResult(fmt.Errorf("file_path required")), nil, nil
+		}
+
+		card, err := svc.GetCard(cardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		fileID, err := svc.UploadFile(cfg.TeamID, card.BoardID, filePath)
+		if err != nil {
+			return errResult(fmt.Errorf("uploading file: %w", err)), nil, nil
+		}
+
+		now := time.Now().UnixMilli()
+		block := &boards.Block{
+			ParentID: cardID,
+			BoardID:  card.BoardID,
+			Type:     "attachment",
+			Title:    filePath,
+			Fields:   map[string]any{"fileId": fileID},
+			CreateAt: now,
+			UpdateAt: now,
+		}
+		if _, err := svc.CreateBlock(card.BoardID, []*boards.Block{block}); err != nil {
+			return errResult(fmt.Errorf("creating attachment block: %w", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("File attached (fileId: %s).", fileID)), nil, nil
+	})
+
+	// skate_download
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_download",
+		Description: "Download an attached file. If output_path is given, the file is saved to disk and the path is returned. Otherwise the file content is returned inline (text files only — binary files require output_path).",
+		InputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"file_id"},
+			"properties": map[string]any{
+				"file_id":     map[string]any{"type": "string", "description": "File ID (from skate_task_files)"},
+				"board_id":    map[string]any{"type": "string", "description": "Board ID (optional, uses default from config)"},
+				"output_path": map[string]any{"type": "string", "description": "Absolute path to save the file. If omitted, the content is returned inline (text files only)."},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
+		fileID := getStr(input, "file_id")
+		if fileID == "" {
+			return errResult(fmt.Errorf("file_id required")), nil, nil
+		}
+		boardID := getStr(input, "board_id")
+		if boardID == "" {
+			boardID = cfg.BoardID
+		}
+		if boardID == "" {
+			return errResult(fmt.Errorf("board_id required")), nil, nil
+		}
+
+		data, err := svc.DownloadFile(cfg.TeamID, boardID, fileID)
+		if err != nil {
+			return errResult(fmt.Errorf("downloading file: %w", err)), nil, nil
+		}
+
+		if outPath := getStr(input, "output_path"); outPath != "" {
+			if err := os.WriteFile(outPath, data, 0o644); err != nil {
+				return errResult(fmt.Errorf("writing file: %w", err)), nil, nil
+			}
+			return textResult(fmt.Sprintf("Saved %d bytes to %s", len(data), outPath)), nil, nil
+		}
+
+		const maxInline = 256 * 1024
+		if len(data) > maxInline {
+			return errResult(fmt.Errorf("file is %d bytes (>%d KiB); pass output_path to save it to disk", len(data), maxInline/1024)), nil, nil
+		}
+		if !utf8.Valid(data) {
+			return errResult(fmt.Errorf("file is not valid UTF-8 (likely binary); pass output_path to save it to disk")), nil, nil
+		}
+		return textResult(string(data)), nil, nil
 	})
 
 	// skate_find
@@ -554,7 +966,8 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 			"type":     "object",
 			"required": []string{"task_id"},
 			"properties": map[string]any{
-				"task_id": map[string]any{"type": "string", "description": "Task/card ID"},
+				"task_id":      map[string]any{"type": "string", "description": "Task/card ID"},
+				"no_translate": map[string]any{"type": "boolean", "description": "Skip translation even if enabled in config (default: false)"},
 			},
 		},
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
@@ -569,7 +982,10 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 		}
 		uc := boards.NewUserCache(svc)
 		defer uc.Flush()
-		tr := translate.New(cfg.Translate)
+		var tr *translate.Translator
+		if noTr, _ := input["no_translate"].(bool); !noTr {
+			tr = translate.New(cfg.Translate)
+		}
 		md := boards.RenderComments(blocks, uc, tr)
 		return textResult(md), nil, nil
 	})
@@ -611,6 +1027,134 @@ Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" 
 		}
 		if len(lines) == 0 {
 			return textResult("No files attached."), nil, nil
+		}
+		return textResult(strings.Join(lines, "\n")), nil, nil
+	})
+
+	// skate_state
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_state",
+		Description: "Snapshot of your current working state on the configured board: who you are, the timer that's running (if any), and the In Progress tasks assigned to you. Useful as a session-resume preamble.",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"board_id": map[string]any{"type": "string", "description": "Board ID (optional, uses default from config)"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
+		boardID := getStr(input, "board_id")
+		if boardID == "" {
+			boardID = cfg.BoardID
+		}
+		if boardID == "" {
+			return errResult(fmt.Errorf("board_id required")), nil, nil
+		}
+
+		me, _ := svc.GetMe()
+		timer, _ := svc.GetRunningTimer()
+
+		board, err := svc.GetBoard(boardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		cards, err := svc.ListCards(boardID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		defs := boards.ParsePropertyDefs(board)
+		resolved := boards.ResolveCards(cards, defs)
+		boards.SortByPriority(resolved)
+
+		var inProgress []boards.ResolvedCard
+		for _, rc := range resolved {
+			if strings.EqualFold(rc.Status, "In Progress") {
+				inProgress = append(inProgress, rc)
+			}
+		}
+		if me != nil {
+			inProgress = boards.FilterMine(inProgress, me)
+		}
+
+		var sb strings.Builder
+		if me != nil {
+			fmt.Fprintf(&sb, "User: @%s (%s)\n", me.Username, me.ID)
+		}
+		if timer != nil {
+			elapsed := boards.FormatDuration((time.Now().UnixMilli() - timer.StartTime) / 1000)
+			fmt.Fprintf(&sb, "Running timer: %s (%s elapsed) [card: %s]\n", timer.CardName, elapsed, timer.CardID)
+		} else {
+			sb.WriteString("Running timer: none\n")
+		}
+		sb.WriteString("\nIn Progress (yours):\n")
+		if len(inProgress) == 0 {
+			sb.WriteString("  (none)\n")
+		} else {
+			for _, rc := range inProgress {
+				fmt.Fprintf(&sb, "  - [%s] %s | Priority: %s\n", rc.ID, rc.Title, rc.Priority)
+			}
+		}
+		return textResult(sb.String()), nil, nil
+	})
+
+	// skate_users
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_users",
+		Description: "List team members. Use to look up a user ID before assigning a task — assignee fields can take a username (resolved to ID) or a raw user ID.",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"query": map[string]any{"type": "string", "description": "Optional substring to filter by username or full name (case-insensitive)"},
+			},
+		},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
+		users, err := svc.ListUsers(cfg.TeamID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		if q := strings.ToLower(getStr(input, "query")); q != "" {
+			filtered := users[:0]
+			for _, u := range users {
+				if strings.Contains(strings.ToLower(u.Username), q) ||
+					strings.Contains(strings.ToLower(u.FirstName+" "+u.LastName), q) {
+					filtered = append(filtered, u)
+				}
+			}
+			users = filtered
+		}
+		if len(users) == 0 {
+			return textResult("No users found."), nil, nil
+		}
+		var lines []string
+		for _, u := range users {
+			name := strings.TrimSpace(u.FirstName + " " + u.LastName)
+			if name != "" {
+				lines = append(lines, fmt.Sprintf("- @%s (%s) | id: %s", u.Username, name, u.ID))
+			} else {
+				lines = append(lines, fmt.Sprintf("- @%s | id: %s", u.Username, u.ID))
+			}
+		}
+		return textResult(strings.Join(lines, "\n")), nil, nil
+	})
+
+	// skate_me
+	mcpsdk.AddTool(s, &mcpsdk.Tool{
+		Name:        "skate_me",
+		Description: "Identify the Mattermost user this server is authenticated as. Useful for self-attribution in comments and for filtering 'my' tasks.",
+		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
+		me, err := svc.GetMe()
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		lines := []string{
+			fmt.Sprintf("id: %s", me.ID),
+			fmt.Sprintf("username: %s", me.Username),
+		}
+		if name := strings.TrimSpace(me.FirstName + " " + me.LastName); name != "" {
+			lines = append(lines, fmt.Sprintf("name: %s", name))
+		}
+		if me.Nickname != "" {
+			lines = append(lines, fmt.Sprintf("nickname: %s", me.Nickname))
 		}
 		return textResult(strings.Join(lines, "\n")), nil, nil
 	})

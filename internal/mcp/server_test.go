@@ -42,9 +42,11 @@ func TestToolSchemas(t *testing.T) {
 			schema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"board_id": map[string]any{"type": "string"},
-					"status":   map[string]any{"type": "string"},
-					"show_all": map[string]any{"type": "boolean"},
+					"board_id":  map[string]any{"type": "string"},
+					"status":    map[string]any{"type": "string"},
+					"show_all":  map[string]any{"type": "boolean"},
+					"mine":      map[string]any{"type": "boolean"},
+					"all_users": map[string]any{"type": "boolean"},
 				},
 			},
 		},
@@ -54,7 +56,35 @@ func TestToolSchemas(t *testing.T) {
 				"type":     "object",
 				"required": []string{"task_id"},
 				"properties": map[string]any{
-					"task_id": map[string]any{"type": "string"},
+					"task_id":      map[string]any{"type": "string"},
+					"no_translate": map[string]any{"type": "boolean"},
+				},
+			},
+		},
+		{
+			name: "skate_next",
+			schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"board_id":     map[string]any{"type": "string"},
+					"mine":         map[string]any{"type": "boolean"},
+					"no_translate": map[string]any{"type": "boolean"},
+				},
+			},
+		},
+		{
+			name: "skate_update_task",
+			schema: map[string]any{
+				"type":     "object",
+				"required": []string{"task_id"},
+				"properties": map[string]any{
+					"task_id":     map[string]any{"type": "string"},
+					"title":       map[string]any{"type": "string"},
+					"icon":        map[string]any{"type": "string"},
+					"status":      map[string]any{"type": "string"},
+					"priority":    map[string]any{"type": "string"},
+					"assignee":    map[string]any{"type": "string"},
+					"start_timer": map[string]any{"type": "boolean"},
 				},
 			},
 		},
@@ -62,9 +92,10 @@ func TestToolSchemas(t *testing.T) {
 			name: "skate_update_status",
 			schema: map[string]any{
 				"type":     "object",
-				"required": []string{"task_id", "status"},
+				"required": []string{"status"},
 				"properties": map[string]any{
 					"task_id":     map[string]any{"type": "string"},
+					"task_ids":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 					"status":      map[string]any{"type": "string"},
 					"start_timer": map[string]any{"type": "boolean"},
 				},
@@ -90,6 +121,52 @@ func TestToolSchemas(t *testing.T) {
 					"task_id":    map[string]any{"type": "string"},
 					"text":       map[string]any{"type": "string"},
 					"block_type": map[string]any{"type": "string"},
+				},
+			},
+		},
+		{
+			name: "skate_edit_block",
+			schema: map[string]any{
+				"type":     "object",
+				"required": []string{"task_id", "block_id", "text"},
+				"properties": map[string]any{
+					"task_id":  map[string]any{"type": "string"},
+					"block_id": map[string]any{"type": "string"},
+					"text":     map[string]any{"type": "string"},
+				},
+			},
+		},
+		{
+			name: "skate_delete_block",
+			schema: map[string]any{
+				"type":     "object",
+				"required": []string{"task_id", "block_id"},
+				"properties": map[string]any{
+					"task_id":  map[string]any{"type": "string"},
+					"block_id": map[string]any{"type": "string"},
+				},
+			},
+		},
+		{
+			name: "skate_attach",
+			schema: map[string]any{
+				"type":     "object",
+				"required": []string{"task_id", "file_path"},
+				"properties": map[string]any{
+					"task_id":   map[string]any{"type": "string"},
+					"file_path": map[string]any{"type": "string"},
+				},
+			},
+		},
+		{
+			name: "skate_download",
+			schema: map[string]any{
+				"type":     "object",
+				"required": []string{"file_id"},
+				"properties": map[string]any{
+					"file_id":     map[string]any{"type": "string"},
+					"board_id":    map[string]any{"type": "string"},
+					"output_path": map[string]any{"type": "string"},
 				},
 			},
 		},
@@ -126,6 +203,28 @@ func TestToolSchemas(t *testing.T) {
 		{
 			name:   "skate_config",
 			schema: map[string]any{"type": "object", "properties": map[string]any{}},
+		},
+		{
+			name:   "skate_me",
+			schema: map[string]any{"type": "object", "properties": map[string]any{}},
+		},
+		{
+			name: "skate_state",
+			schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"board_id": map[string]any{"type": "string"},
+				},
+			},
+		},
+		{
+			name: "skate_users",
+			schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"query": map[string]any{"type": "string"},
+				},
+			},
 		},
 	}
 

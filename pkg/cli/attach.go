@@ -38,7 +38,7 @@ var attachCmd = &cobra.Command{
 			BoardID:  card.BoardID,
 			Type:     "attachment",
 			Title:    filePath,
-			Fields:   map[string]interface{}{"fileId": fileID},
+			Fields:   map[string]any{"fileId": fileID},
 			CreateAt: now,
 			UpdateAt: now,
 		}

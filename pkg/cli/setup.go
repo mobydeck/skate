@@ -44,8 +44,8 @@ func init() {
 	setupCmd.Flags().BoolP("project", "p", false, "Install for current project only")
 }
 
-func mcpEntry() map[string]interface{} {
-	return map[string]interface{}{
+func mcpEntry() map[string]any {
+	return map[string]any{
 		"type":    "stdio",
 		"command": "skate",
 		"args":    []string{"mcp"},
@@ -142,18 +142,18 @@ func upsertMCPConfig(path, serversKey, toolName string) error {
 		os.MkdirAll(dir, 0o755)
 	}
 
-	var data map[string]interface{}
+	var data map[string]any
 	raw, err := os.ReadFile(path)
 	if err == nil {
 		json.Unmarshal(raw, &data)
 	}
 	if data == nil {
-		data = make(map[string]interface{})
+		data = make(map[string]any)
 	}
 
-	servers, ok := data[serversKey].(map[string]interface{})
+	servers, ok := data[serversKey].(map[string]any)
 	if !ok {
-		servers = make(map[string]interface{})
+		servers = make(map[string]any)
 	}
 
 	servers[toolName] = mcpEntry()
