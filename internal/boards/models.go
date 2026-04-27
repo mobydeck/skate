@@ -24,7 +24,7 @@ type Card struct {
 	CreatedBy    string                 `json:"createdBy"`
 	ModifiedBy   string                 `json:"modifiedBy"`
 	Title        string                 `json:"title"`
-	ContentOrder []string               `json:"contentOrder"`
+	ContentOrder []any                  `json:"contentOrder"`
 	Icon         string                 `json:"icon"`
 	IsTemplate   bool                   `json:"isTemplate"`
 	Properties   map[string]interface{} `json:"properties"`
@@ -36,7 +36,7 @@ type Card struct {
 type CardPatch struct {
 	Title             *string                `json:"title,omitempty"`
 	Icon              *string                `json:"icon,omitempty"`
-	ContentOrder      []string               `json:"contentOrder,omitempty"`
+	ContentOrder      []any                  `json:"contentOrder,omitempty"`
 	UpdatedProperties map[string]interface{} `json:"updatedProperties,omitempty"`
 }
 

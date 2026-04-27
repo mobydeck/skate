@@ -173,7 +173,7 @@ func (s *Service) CreateContentBlock(boardID, cardID string, block *Block) (*Blo
 	if err != nil {
 		return created[0], nil // block created but contentOrder not updated
 	}
-	newOrder := append(card.ContentOrder, created[0].ID)
+	newOrder := append(card.ContentOrder, any(created[0].ID))
 	s.PatchCard(cardID, &CardPatch{ContentOrder: newOrder})
 
 	return created[0], nil

@@ -103,6 +103,91 @@ func TestRenderCardMarkdown_InlineImage(t *testing.T) {
 	}
 }
 
+func TestRenderCardMarkdown_ContentOrder(t *testing.T) {
+	card := &Card{
+		Title: "Test",
+		ContentOrder: []any{
+			"b1", "b2", "b3",
+		},
+	}
+	board := &Board{}
+	// Blocks arrive from the API in a different order than ContentOrder.
+	blocks := []*Block{
+		{ID: "b3", Type: "text", Title: "Third"},
+		{ID: "b1", Type: "text", Title: "First"},
+		{ID: "b2", Type: "text", Title: "Second"},
+	}
+
+	md := RenderCardMarkdown(card, board, blocks, nil, nil, nil)
+
+	first := strings.Index(md, "First")
+	second := strings.Index(md, "Second")
+	third := strings.Index(md, "Third")
+	if first < 0 || second < 0 || third < 0 {
+		t.Fatalf("missing content blocks in output:\n%s", md)
+	}
+	if !(first < second && second < third) {
+		t.Errorf("content blocks should follow ContentOrder, got positions First=%d Second=%d Third=%d\n%s", first, second, third, md)
+	}
+}
+
+func TestRenderCardMarkdown_ContentOrderNestedRows(t *testing.T) {
+	// Focalboard groups inline content as nested arrays inside ContentOrder.
+	card := &Card{
+		Title: "Test",
+		ContentOrder: []any{
+			"b1",
+			[]any{"b2", "b3"},
+			"b4",
+		},
+	}
+	board := &Board{}
+	blocks := []*Block{
+		{ID: "b4", Type: "text", Title: "Fourth"},
+		{ID: "b2", Type: "text", Title: "Second"},
+		{ID: "b1", Type: "text", Title: "First"},
+		{ID: "b3", Type: "text", Title: "Third"},
+	}
+
+	md := RenderCardMarkdown(card, board, blocks, nil, nil, nil)
+
+	pos := []int{
+		strings.Index(md, "First"),
+		strings.Index(md, "Second"),
+		strings.Index(md, "Third"),
+		strings.Index(md, "Fourth"),
+	}
+	for i := 1; i < len(pos); i++ {
+		if pos[i-1] < 0 || pos[i] < 0 || pos[i-1] >= pos[i] {
+			t.Errorf("nested ContentOrder not flattened in order, positions=%v\n%s", pos, md)
+			break
+		}
+	}
+}
+
+func TestRenderCardMarkdown_ContentOrderUnlistedBlocksTrail(t *testing.T) {
+	card := &Card{
+		Title:        "Test",
+		ContentOrder: []any{"b1"},
+	}
+	board := &Board{}
+	blocks := []*Block{
+		{ID: "borphan", Type: "text", Title: "Orphan"},
+		{ID: "b1", Type: "text", Title: "Listed"},
+	}
+
+	md := RenderCardMarkdown(card, board, blocks, nil, nil, nil)
+
+	listed := strings.Index(md, "Listed")
+	orphan := strings.Index(md, "Orphan")
+	if listed < 0 || orphan < 0 {
+		t.Fatalf("missing block in output:\n%s", md)
+	}
+	if listed > orphan {
+		t.Errorf("blocks present in ContentOrder should appear before unlisted ones; got Listed=%d Orphan=%d\n%s", listed, orphan, md)
+	}
+}
+
 func TestRenderCardMarkdown_CreatedBy(t *testing.T) {
 	card := &Card{Title: "Test", CreatedBy: "user-abc"}
 	board := &Board{}

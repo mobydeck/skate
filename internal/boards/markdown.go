@@ -70,6 +70,19 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 		}
 	}
 
+	// Order content blocks per card.ContentOrder (the authoritative order shown
+	// in the web UI). Blocks not referenced in ContentOrder fall to the end in
+	// their original arrival order.
+	orderIdx := flattenContentOrder(card.ContentOrder)
+	sort.SliceStable(contentBlocks, func(i, j int) bool {
+		pi, oki := orderIdx[contentBlocks[i].ID]
+		pj, okj := orderIdx[contentBlocks[j].ID]
+		if oki && okj {
+			return pi < pj
+		}
+		return oki && !okj
+	})
+
 	if len(contentBlocks) > 0 {
 		sb.WriteString("## Description\n\n")
 		for _, b := range contentBlocks {
@@ -201,6 +214,34 @@ func RenderComments(blocks []*Block, uc *UserCache, tr TextTranslator) string {
 		fmt.Fprintf(&sb, "**@%s** (%s):\n> %s\n\n", author, date, tl(tr, c.Title))
 	}
 	return sb.String()
+}
+
+// flattenContentOrder turns a card's ContentOrder into a {blockID: position}
+// map. Focalboard stores the order as a list whose elements are either a
+// string (block ID) or an array of strings (a row of grouped blocks).
+func flattenContentOrder(order []any) map[string]int {
+	idx := make(map[string]int, len(order))
+	pos := 0
+	for _, e := range order {
+		switch v := e.(type) {
+		case string:
+			idx[v] = pos
+			pos++
+		case []any:
+			for _, inner := range v {
+				if s, ok := inner.(string); ok {
+					idx[s] = pos
+					pos++
+				}
+			}
+		case []string:
+			for _, s := range v {
+				idx[s] = pos
+				pos++
+			}
+		}
+	}
+	return idx
 }
 
 func tl(tr TextTranslator, text string) string {

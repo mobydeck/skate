@@ -1,3 +1,5 @@
+set dotenv-load
+
 version := `git describe --tags --always --dirty 2>/dev/null || echo dev`
 module := "skate"
 ldflags := "-s -w -X " + module + "/internal/version.Version=" + version
@@ -153,3 +155,6 @@ brew-formula: checksums
 # Lint
 lint:
     golangci-lint run ./...
+
+commit:
+    aicommit -d --model gpt-5-mini
