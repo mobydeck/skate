@@ -66,13 +66,20 @@ skate setup opencode      # OpenCode
 skate setup roocode       # RooCode
 ```
 
-This registers the MCP server and installs a skill file that teaches the agent how to use Skate.
+This registers the MCP server and installs a skill file (`SKILL.md` — the workflow guide) that teaches the agent how to use Skate.
 
 Use `--project` / `-p` flag to install for the current project only (writes to `.mcp.json` instead of global config).
 
+**Re-run after every `skate` upgrade** — `skate setup` overwrites the installed `SKILL.md` with the version embedded in the new binary, so the agent picks up new tools and conventions. Use `diff <(skate skill) <(tail -n +6 ~/.claude/skills/skate/SKILL.md)` to check whether the installed copy is in sync.
+
 ### 4. Bootstrap an AI agent session
 
-If an agent doesn't auto-discover MCP or skills, paste the output of `skate prompt` into the chat:
+In most cases nothing extra is needed:
+
+- The MCP server returns the workflow guide's location during the `initialize` handshake (the `instructions` field). Claude Code and other compliant clients inject this into the model's context automatically — no manual prompt required.
+- If no installed `SKILL.md` is found (e.g. `--project` install or unknown agent), the handshake instead tells the agent to call the `skate_help` MCP tool, which returns the same content inline.
+
+If an agent doesn't honor either signal, paste the output of `skate prompt` into the chat:
 
 ```bash
 skate prompt claude-code   # or: cursor, codex
@@ -213,6 +220,16 @@ skate users                           # List team members
 skate users arthur                    # Filter team members by username/name substring
 ```
 
+### Workflow guide (SKILL.md)
+
+```bash
+skate skill                                                        # Print the embedded workflow guide
+skate skill | less                                                 # Paginate
+diff <(skate skill) <(tail -n +6 ~/.claude/skills/skate/SKILL.md)  # Check installed copy is current
+```
+
+`skate skill` prints the same content the `skate_help` MCP tool returns. Useful for iterating on the guide and verifying that `skate setup` installed the latest version.
+
 ### Output Formats
 
 All data commands support `--json` / `-j` and `--yaml` / `-y` flags:
@@ -226,11 +243,13 @@ skate task-files <ID> -y
 
 ## MCP Tools
 
-When connected via MCP, AI agents can use these tools:
+When connected via MCP, AI agents can use these tools.
+
+The MCP server's `initialize` response sets the `instructions` field to a one-line directive pointing the agent at the installed `SKILL.md` (or telling it to call `skate_help` if no file is installed). Most clients inject this into the model's context automatically, so the agent learns the workflow without any manual setup.
 
 | Tool | Description |
 |------|-------------|
-| `skate_help` | Get workflow guide (call this first) |
+| `skate_help` | Return the canonical Skate workflow guide (the same content as the installed `SKILL.md`) plus the server's configured `board_id` |
 | `skate_statuses` | List available statuses for the board |
 | `skate_boards` | List available boards |
 | `skate_tasks` | List tasks (default: active only; `show_all`, `mine`, `all_users` flags) |

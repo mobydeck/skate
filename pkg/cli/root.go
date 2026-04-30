@@ -60,6 +60,7 @@ func init() {
 	rootCmd.AddCommand(editBlockCmd)
 	rootCmd.AddCommand(nextCmd)
 	rootCmd.AddCommand(stateCmd)
+	rootCmd.AddCommand(skillCmd)
 }
 
 func loadConfigAndService() (*config.Config, *boards.Service, error) {

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,10 +8,9 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-)
 
-//go:embed skills/skate/SKILL.md
-var skillFS embed.FS
+	"skate/internal/skill"
+)
 
 var setupCmd = &cobra.Command{
 	Use:   "setup <agent>",
@@ -182,13 +180,8 @@ func installSkill(agent string) error {
 	}
 
 	os.MkdirAll(skillDir, 0o755)
-	content, err := skillFS.ReadFile("skills/skate/SKILL.md")
-	if err != nil {
-		return fmt.Errorf("reading embedded skill: %w", err)
-	}
-
 	skillPath := filepath.Join(skillDir, "SKILL.md")
-	if err := os.WriteFile(skillPath, content, 0o644); err != nil {
+	if err := os.WriteFile(skillPath, skill.Raw(), 0o644); err != nil {
 		return fmt.Errorf("writing skill: %w", err)
 	}
 	fmt.Printf("Skill installed: %s\n", skillPath)

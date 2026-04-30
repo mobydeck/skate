@@ -14,6 +14,7 @@ import (
 	"skate/internal/boards"
 	"skate/internal/client"
 	"skate/internal/config"
+	"skate/internal/skill"
 	"skate/internal/translate"
 	"skate/internal/version"
 )
@@ -33,7 +34,9 @@ func RunServer() error {
 	server := mcpsdk.NewServer(&mcpsdk.Implementation{
 		Name:    "skate",
 		Version: version.Version,
-	}, nil)
+	}, &mcpsdk.ServerOptions{
+		Instructions: skill.Pointer(),
+	})
 
 	if err := registerTools(server, svc, cfg); err != nil {
 		return fmt.Errorf("registering tools: %w", err)
@@ -46,63 +49,17 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 	// skate_help
 	mcpsdk.AddTool(s, &mcpsdk.Tool{
 		Name:        "skate_help",
-		Description: "Get Skate workflow guide. Call this first to understand how to use Skate tools for task management.",
+		Description: "Get the canonical Skate workflow guide (full SKILL.md). Call once per session if the guide isn't already loaded.",
 		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
-		boardSection := `## IMPORTANT: board_id parameter
-Many tools require a board_id. You MUST pass it explicitly to: skate_tasks, skate_statuses, skate_find, skate_create_task.
-No default board_id is configured. Call skate_boards to list boards, then use the correct ID.`
-
+		// Prepend a per-session board_id hint that the static SKILL.md can't carry.
+		var header string
 		if cfg.BoardID != "" {
-			boardSection = fmt.Sprintf(`## Board ID
-Your configured board_id is: %s
-Pass this to skate_tasks, skate_statuses, skate_find, and skate_create_task.`, cfg.BoardID)
+			header = fmt.Sprintf("## Board ID (this server)\nConfigured board_id: %s\nPass this to skate_tasks, skate_statuses, skate_find, and skate_create_task when the tool requires it.\n\n---\n\n", cfg.BoardID)
+		} else {
+			header = "## Board ID (this server)\nNo default board_id is configured. Call skate_boards to list boards, then pass the correct ID to skate_tasks, skate_statuses, skate_find, and skate_create_task.\n\n---\n\n"
 		}
-
-		help := fmt.Sprintf(`# Skate — Task Management for AI Agents
-
-Skate connects to Mattermost Boards. Follow this workflow:
-
-%s
-
-## Starting a task
-1. skate_boards — get available boards and their IDs
-2. skate_next — shortcut: pick the top-priority Not Started task and return its full details (one call instead of list+sort+pick+task)
-3. skate_tasks — list active tasks (pass board_id if needed)
-4. skate_task — read full task details (description, comments, attachments)
-5. skate_task_files — check for attached files
-6. skate_download — fetch any attached files worth reading (text inline, or save with output_path)
-7. skate_find — search for related tasks by keyword (pass board_id if needed)
-8. skate_statuses — check available statuses for the board (pass board_id if needed)
-9. skate_update_status — set "In Progress" with start_timer: true
-
-## While working
-- skate_comment — add progress comments (mention @last_commenter, append signature)
-- skate_add_content — add persistent notes to the task description
-- skate_attach — upload a local file (logs, configs, screenshots, plan docs) and attach it to the task
-- skate_edit_block — rewrite a comment, content block, or heading in place
-- skate_delete_block — fix a mistake: remove a wrong comment, content block, or attachment by block_id
-- skate_update_task — change title, icon, status, priority, or assignee on an existing task (general form of skate_update_status)
-- skate_create_task — create new tasks (pass board_id if needed)
-
-## Finishing
-1. skate_timer_stop — stop timer with notes about what was done
-2. skate_update_status — set final status (call skate_statuses first to see valid values)
-3. skate_comment — add final summary
-
-## Conventions
-- Always mention the last relevant person: @username at start of comment
-- Always sign comments: — agent-name (model-name)
-- Check skate_config for mentions and translate settings
-- Call skate_me to know which user this server is authenticated as. Mentioning that same user is fine — agents often share an account with their operator, and the @-mention is what delivers the notification. Don't suppress a mention just because the names match.
-- Use skate_users to look up a username before calling skate_create_task with assignee — assignee fields accept a username or a raw user ID
-- Resuming a session? Call skate_state once to see your running timer and In Progress tasks before doing anything else
-
-## IMPORTANT: Statuses vary per board
-Call skate_statuses BEFORE updating status to see valid values for the current board.
-Do NOT guess status names — they differ between boards (e.g. "Completed 🙌" vs "Done").`, boardSection)
-
-		return textResult(help), nil, nil
+		return textResult(header + skill.Markdown()), nil, nil
 	})
 
 	// skate_statuses
