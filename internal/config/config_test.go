@@ -330,6 +330,17 @@ func TestCacheDir_Linux(t *testing.T) {
 	}
 }
 
+func TestDownloadsDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	got := DownloadsDir()
+	want := filepath.Join(home, ".cache", "skate", "downloads")
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && filepath.Base(s) != "" && // just use strings
 		stringContains(s, substr)

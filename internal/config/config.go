@@ -61,6 +61,12 @@ func CacheDir() string {
 	return filepath.Join(home, ".cache", "skate")
 }
 
+// DownloadsDir is where skate_download writes files when the agent didn't
+// pass an explicit output_path and the file is too large to return inline.
+func DownloadsDir() string {
+	return filepath.Join(CacheDir(), "downloads")
+}
+
 func LoadGlobal() (*Config, error) {
 	cfg := &Config{}
 	data, err := os.ReadFile(GlobalConfigPath())

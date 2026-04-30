@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -803,14 +804,14 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 	// skate_download
 	mcpsdk.AddTool(s, &mcpsdk.Tool{
 		Name:        "skate_download",
-		Description: "Download an attached file. If output_path is given, the file is saved to disk and the path is returned. Otherwise the file content is returned inline (text files only — binary files require output_path).",
+		Description: "Download an attached file. Small text files (under 32 KiB, valid UTF-8) are returned inline. Larger or binary files are written to disk and the path is returned — use your own file tools to read it. Pass output_path to choose the location; otherwise files land in skate's cache dir (clean with `skate cache clean`).",
 		InputSchema: map[string]any{
 			"type":     "object",
 			"required": []string{"file_id"},
 			"properties": map[string]any{
 				"file_id":     map[string]any{"type": "string", "description": "File ID (from skate_task_files)"},
 				"board_id":    map[string]any{"type": "string", "description": "Board ID (optional, uses default from config)"},
-				"output_path": map[string]any{"type": "string", "description": "Absolute path to save the file. If omitted, the content is returned inline (text files only)."},
+				"output_path": map[string]any{"type": "string", "description": "Absolute path to save the file. If omitted, files too large/binary for inline return are saved into skate's cache dir."},
 			},
 		},
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input map[string]any) (*mcpsdk.CallToolResult, any, error) {
@@ -831,6 +832,7 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 			return errResult(fmt.Errorf("downloading file: %w", err)), nil, nil
 		}
 
+		// Explicit output_path: always save there, no size/encoding checks.
 		if outPath := getStr(input, "output_path"); outPath != "" {
 			if err := os.WriteFile(outPath, data, 0o644); err != nil {
 				return errResult(fmt.Errorf("writing file: %w", err)), nil, nil
@@ -838,14 +840,28 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 			return textResult(fmt.Sprintf("Saved %d bytes to %s", len(data), outPath)), nil, nil
 		}
 
-		const maxInline = 256 * 1024
+		// Inline only when small AND text. Otherwise auto-save to cache.
+		const maxInline = 32 * 1024
+		if len(data) <= maxInline && utf8.Valid(data) {
+			return textResult(string(data)), nil, nil
+		}
+
+		dir := config.DownloadsDir()
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return errResult(fmt.Errorf("creating cache dir: %w", err)), nil, nil
+		}
+		cachePath := filepath.Join(dir, fileID)
+		if err := os.WriteFile(cachePath, data, 0o644); err != nil {
+			return errResult(fmt.Errorf("writing cache file: %w", err)), nil, nil
+		}
+		reason := fmt.Sprintf("%d bytes", len(data))
 		if len(data) > maxInline {
-			return errResult(fmt.Errorf("file is %d bytes (>%d KiB); pass output_path to save it to disk", len(data), maxInline/1024)), nil, nil
+			reason += fmt.Sprintf(" (>%d KiB inline limit)", maxInline/1024)
 		}
 		if !utf8.Valid(data) {
-			return errResult(fmt.Errorf("file is not valid UTF-8 (likely binary); pass output_path to save it to disk")), nil, nil
+			reason += " (binary)"
 		}
-		return textResult(string(data)), nil, nil
+		return textResult(fmt.Sprintf("Saved to %s — %s. Read it with your own file tools (clean later with `skate cache clean`).", cachePath, reason)), nil, nil
 	})
 
 	// skate_find

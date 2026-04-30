@@ -61,6 +61,7 @@ func init() {
 	rootCmd.AddCommand(nextCmd)
 	rootCmd.AddCommand(stateCmd)
 	rootCmd.AddCommand(skillCmd)
+	rootCmd.AddCommand(cacheCmd)
 }
 
 func loadConfigAndService() (*config.Config, *boards.Service, error) {

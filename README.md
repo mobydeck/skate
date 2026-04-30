@@ -230,6 +230,15 @@ diff <(skate skill) <(tail -n +6 ~/.claude/skills/skate/SKILL.md)  # Check insta
 
 `skate skill` prints the same content the `skate_help` MCP tool returns. Useful for iterating on the guide and verifying that `skate setup` installed the latest version.
 
+### Cache
+
+```bash
+skate cache ls          # List cached download files (size + mtime)
+skate cache clean       # Delete all cached download files
+```
+
+The cache holds files saved by the `skate_download` MCP tool when an agent didn't pass an explicit `output_path`. Default location: `~/.cache/skate/downloads/` (Linux) / `%LocalAppData%\skate\downloads\` (Windows).
+
 ### Output Formats
 
 All data commands support `--json` / `-j` and `--yaml` / `-y` flags:
@@ -264,7 +273,7 @@ The MCP server's `initialize` response sets the `instructions` field to a one-li
 | `skate_attach` | Upload a local file and attach it to a task |
 | `skate_edit_block` | Rewrite a content block, comment, or heading in place |
 | `skate_delete_block` | Delete a content block, comment, or attachment by block ID |
-| `skate_download` | Download an attached file (inline for text, save to disk via `output_path` for binary) |
+| `skate_download` | Download an attached file. ≤32 KiB UTF-8 → inline; otherwise auto-saved to `~/.cache/skate/downloads/<file_id>` (or `output_path` if given). |
 | `skate_comments` | Get all comments for a task (`no_translate` to skip translation) |
 | `skate_task_files` | List files attached to a task |
 | `skate_find` | Search tasks by title and content |

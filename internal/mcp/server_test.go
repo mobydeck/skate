@@ -171,6 +171,15 @@ func TestToolSchemas(t *testing.T) {
 			},
 		},
 		{
+			name: "skate_users",
+			schema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"query": map[string]any{"type": "string"},
+				},
+			},
+		},
+		{
 			name: "skate_find",
 			schema: map[string]any{
 				"type":     "object",
@@ -214,15 +223,6 @@ func TestToolSchemas(t *testing.T) {
 				"type": "object",
 				"properties": map[string]any{
 					"board_id": map[string]any{"type": "string"},
-				},
-			},
-		},
-		{
-			name: "skate_users",
-			schema: map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"query": map[string]any{"type": "string"},
 				},
 			},
 		},
