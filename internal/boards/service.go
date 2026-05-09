@@ -452,7 +452,15 @@ func ResolvePropertyValue(defs []PropertyDef, propID string, rawValue any) strin
 	return fmt.Sprintf("%v", rawValue)
 }
 
-func ResolveCards(cards []*Card, defs []PropertyDef) []ResolvedCard {
+// ResolveCards turns raw cards into ResolvedCard with select-option labels and
+// (when uc is non-nil) usernames in place of user IDs for person-type
+// properties. Pass uc=nil to skip username resolution — callers that just
+// need IDs (filtering, comparisons) save the API round-trip.
+//
+// When a board has both "Assignee" (person) and "Assignees" (multiPerson),
+// non-empty values from later properties overwrite earlier ones, so the
+// multiPerson list wins when present. Empty values don't overwrite.
+func ResolveCards(cards []*Card, defs []PropertyDef, uc *UserCache) []ResolvedCard {
 	resolved := make([]ResolvedCard, 0, len(cards))
 	for _, c := range cards {
 		rc := ResolvedCard{Card: *c}
@@ -461,21 +469,75 @@ func ResolveCards(cards []*Card, defs []PropertyDef) []ResolvedCard {
 			if !ok {
 				continue
 			}
-			resolved := ResolvePropertyValue(defs, d.ID, val)
+			var rv string
+			if d.Type == "person" || d.Type == "multiPerson" {
+				rv = resolvePersonValue(val, uc)
+			} else {
+				rv = ResolvePropertyValue(defs, d.ID, val)
+			}
+			if rv == "" {
+				continue
+			}
 			switch strings.ToLower(d.Name) {
 			case "status":
-				rc.Status = resolved
+				rc.Status = rv
 			case "priority":
-				rc.Priority = resolved
+				rc.Priority = rv
 			case "assignee", "assignees":
-				rc.Assignee = resolved
+				rc.Assignee = rv
 			case "due date", "duedate", "due_date":
-				rc.DueDate = resolved
+				rc.DueDate = rv
 			}
 		}
 		resolved = append(resolved, rc)
 	}
 	return resolved
+}
+
+// resolvePersonValue handles both person (string user ID) and multiPerson
+// (array of user IDs) property values. With uc non-nil, IDs are resolved to
+// usernames; otherwise raw IDs are returned. Multiple users are joined with
+// ", ".
+func resolvePersonValue(raw any, uc *UserCache) string {
+	var ids []string
+	switch v := raw.(type) {
+	case string:
+		if v != "" {
+			ids = append(ids, v)
+		}
+	case []any:
+		for _, e := range v {
+			if s, ok := e.(string); ok && s != "" {
+				ids = append(ids, s)
+			}
+		}
+	case []string:
+		for _, s := range v {
+			if s != "" {
+				ids = append(ids, s)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return ""
+	}
+	if uc == nil {
+		return strings.Join(ids, ", ")
+	}
+	names := make([]string, 0, len(ids))
+	for _, id := range ids {
+		names = append(names, uc.Resolve(id))
+	}
+	return strings.Join(names, ", ")
+}
+
+// AtPrefix returns "@name" for non-empty input, or "" so empty cells stay
+// blank in tabular and list output.
+func AtPrefix(name string) string {
+	if name == "" {
+		return ""
+	}
+	return "@" + name
 }
 
 // FilterMine keeps only cards whose Assignee matches the given user.

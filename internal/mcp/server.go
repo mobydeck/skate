@@ -148,8 +148,10 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 			return errResult(err), nil, nil
 		}
 
+		uc := boards.NewUserCache(svc)
+		defer uc.Flush()
 		defs := boards.ParsePropertyDefs(board)
-		resolved := boards.ResolveCards(cards, defs)
+		resolved := boards.ResolveCards(cards, defs, uc)
 		boards.SortByPriority(resolved)
 
 		statusFilter := getStr(input, "status")
@@ -192,7 +194,7 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 		var lines []string
 		for _, rc := range resolved {
 			lines = append(lines, fmt.Sprintf("- [%s] %s | Status: %s | Priority: %s | Assignee: %s",
-				rc.ID, rc.Title, rc.Status, rc.Priority, rc.Assignee))
+				rc.ID, rc.Title, rc.Status, rc.Priority, boards.AtPrefix(rc.Assignee)))
 		}
 		if len(lines) == 0 {
 			return textResult("No tasks found."), nil, nil
@@ -230,8 +232,10 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 			return errResult(err), nil, nil
 		}
 
+		uc := boards.NewUserCache(svc)
+		defer uc.Flush()
 		defs := boards.ParsePropertyDefs(board)
-		resolved := boards.ResolveCards(cards, defs)
+		resolved := boards.ResolveCards(cards, defs, uc)
 		boards.SortByPriority(resolved)
 
 		var queue []boards.ResolvedCard
@@ -260,8 +264,6 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 			return errResult(err), nil, nil
 		}
 		summaries, _ := svc.GetTimeSummary(boardID, top.ID)
-		uc := boards.NewUserCache(svc)
-		defer uc.Flush()
 		var tr *translate.Translator
 		if noTr, _ := input["no_translate"].(bool); !noTr {
 			tr = translate.New(cfg.Translate)
@@ -895,8 +897,10 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 			return errResult(err), nil, nil
 		}
 
+		uc := boards.NewUserCache(svc)
+		defer uc.Flush()
 		defs := boards.ParsePropertyDefs(board)
-		resolved := boards.ResolveCards(cards, defs)
+		resolved := boards.ResolveCards(cards, defs, uc)
 
 		var lines []string
 		for _, rc := range resolved {
@@ -1034,8 +1038,10 @@ func registerTools(s *mcpsdk.Server, svc *boards.Service, cfg *config.Config) er
 		if err != nil {
 			return errResult(err), nil, nil
 		}
+		uc := boards.NewUserCache(svc)
+		defer uc.Flush()
 		defs := boards.ParsePropertyDefs(board)
-		resolved := boards.ResolveCards(cards, defs)
+		resolved := boards.ResolveCards(cards, defs, uc)
 		boards.SortByPriority(resolved)
 
 		var inProgress []boards.ResolvedCard

@@ -40,8 +40,10 @@ Use --mine to limit to tasks assigned to you.`,
 			return fmt.Errorf("listing cards: %w", err)
 		}
 
+		uc := boards.NewUserCache(svc)
+		defer uc.Flush()
 		defs := boards.ParsePropertyDefs(board)
-		resolved := boards.ResolveCards(cards, defs)
+		resolved := boards.ResolveCards(cards, defs, uc)
 		boards.SortByPriority(resolved)
 
 		var queue []boards.ResolvedCard
@@ -79,14 +81,12 @@ Use --mine to limit to tasks assigned to you.`,
 			"blocks":    blocks,
 			"summaries": summaries,
 		}, func() {
-			uc := boards.NewUserCache(svc)
-			defer uc.Flush()
 			var tr *translate.Translator
 			if noTr, _ := cmd.Flags().GetBool("no-translate"); !noTr {
 				tr = translate.New(cfg.Translate)
 			}
 			md := boards.RenderCardMarkdown(card, board, blocks, summaries, uc, tr, defaultMaxComments)
-			fmt.Print(md)
+			printMarkdown(cmd, md)
 		})
 		return nil
 	},

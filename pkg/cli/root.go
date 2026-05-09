@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
 
@@ -29,6 +30,11 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().BoolP("json", "j", false, "Output in JSON format")
 	rootCmd.PersistentFlags().BoolP("yaml", "y", false, "Output in YAML format")
+	// Hidden, undocumented: pretty-print markdown output via Glamour. Strictly a
+	// human-UX nicety — agents and scripts should not rely on it (the rendered
+	// output is ANSI-escaped and unsuitable for parsing).
+	rootCmd.PersistentFlags().BoolP("pretty", "P", false, "")
+	_ = rootCmd.PersistentFlags().MarkHidden("pretty")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(initCmd)
@@ -93,6 +99,23 @@ func getOutputFormat(cmd *cobra.Command) outputFormat {
 		return formatYAML
 	}
 	return formatDefault
+}
+
+// printMarkdown writes md to stdout. When the hidden --pretty flag is set, it
+// runs the input through Glamour for terminal rendering. On any rendering
+// failure it falls back to the raw text so output is never lost.
+func printMarkdown(cmd *cobra.Command, md string) {
+	pretty, _ := cmd.Flags().GetBool("pretty")
+	if !pretty {
+		fmt.Print(md)
+		return
+	}
+	out, err := glamour.Render(md, "auto")
+	if err != nil {
+		fmt.Print(md)
+		return
+	}
+	fmt.Print(out)
 }
 
 func printStructured(cmd *cobra.Command, data any, defaultFn func()) {

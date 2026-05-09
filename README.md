@@ -250,6 +250,20 @@ skate task <ID> -j
 skate task-files <ID> -y
 ```
 
+### Pretty markdown rendering (`--pretty` / `-P`)
+
+For commands that emit markdown (`skate task`, `skate next`, `skate skill`, `skate comments`), pass `--pretty` (or `-P`) to render via [Glamour](https://github.com/charmbracelet/glamour) with terminal styling:
+
+```bash
+skate task <ID> -P
+skate next --pretty
+skate skill -P | less -R
+```
+
+This is a human-only ergonomics flag — it's intentionally hidden from `--help` and not advertised to AI agents. The rendered output contains ANSI escapes and is unsuitable for parsing or automation; use the default raw-markdown output (or `--json`) when scripting.
+
+When stdout is not a TTY (e.g. piped to a file), Glamour falls back to plain reformatted text so pipelines don't get poisoned with escape codes.
+
 ## MCP Tools
 
 When connected via MCP, AI agents can use these tools.

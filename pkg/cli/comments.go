@@ -36,7 +36,7 @@ var commentsCmd = &cobra.Command{
 		if noTr, _ := cmd.Flags().GetBool("no-translate"); !noTr {
 			tr = translate.New(cfg.Translate)
 		}
-		fmt.Print(boards.RenderComments(blocks, uc, tr))
+		printMarkdown(cmd, boards.RenderComments(blocks, uc, tr))
 		return nil
 	},
 }

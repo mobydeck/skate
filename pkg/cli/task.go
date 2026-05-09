@@ -60,7 +60,7 @@ var taskCmd = &cobra.Command{
 				limit = 0
 			}
 			md := boards.RenderCardMarkdown(card, board, blocks, summaries, uc, tr, limit)
-			fmt.Print(md)
+			printMarkdown(cmd, md)
 		})
 		return nil
 	},

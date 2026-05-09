@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"skate/internal/skill"
@@ -16,7 +14,7 @@ var skillCmd = &cobra.Command{
   skate skill | less
   diff <(skate skill) ~/.claude/skills/skate/SKILL.md`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Print(skill.Markdown())
+		printMarkdown(cmd, skill.Markdown())
 		return nil
 	},
 }

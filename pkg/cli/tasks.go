@@ -44,8 +44,10 @@ var tasksCmd = &cobra.Command{
 			return fmt.Errorf("listing cards: %w", err)
 		}
 
+		uc := boards.NewUserCache(svc)
+		defer uc.Flush()
 		defs := boards.ParsePropertyDefs(board)
-		resolved := boards.ResolveCards(cardList, defs)
+		resolved := boards.ResolveCards(cardList, defs, uc)
 		boards.SortByPriority(resolved)
 
 		// Status filtering
@@ -104,7 +106,7 @@ var tasksCmd = &cobra.Command{
 					title = string(runes[:47]) + "..."
 				}
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-					rc.ID, title, rc.Status, rc.Priority, rc.Assignee)
+					rc.ID, title, rc.Status, rc.Priority, boards.AtPrefix(rc.Assignee))
 			}
 			w.Flush()
 		})

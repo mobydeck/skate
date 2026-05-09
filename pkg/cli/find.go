@@ -39,8 +39,10 @@ var findCmd = &cobra.Command{
 			return fmt.Errorf("listing cards: %w", err)
 		}
 
+		uc := boards.NewUserCache(svc)
+		defer uc.Flush()
 		defs := boards.ParsePropertyDefs(board)
-		resolved := boards.ResolveCards(cards, defs)
+		resolved := boards.ResolveCards(cards, defs, uc)
 
 		type matchResult struct {
 			card    boards.ResolvedCard
@@ -94,7 +96,7 @@ var findCmd = &cobra.Command{
 					fmt.Fprintf(w, "  |  Priority: %s", m.card.Priority)
 				}
 				if m.card.Assignee != "" {
-					fmt.Fprintf(w, "  |  Assignee: %s", m.card.Assignee)
+					fmt.Fprintf(w, "  |  Assignee: %s", boards.AtPrefix(m.card.Assignee))
 				}
 				fmt.Fprintln(w)
 				if m.snippet != "" {

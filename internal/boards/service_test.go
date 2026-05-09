@@ -130,6 +130,124 @@ func TestResolvePropertyValue(t *testing.T) {
 	}
 }
 
+func TestResolveCards_PersonProperty(t *testing.T) {
+	defs := []PropertyDef{
+		{ID: "p1", Name: "Status", Type: "select", Options: []PropertyOption{{ID: "o-todo", Value: "Not Started"}}},
+		{ID: "p2", Name: "Assignee", Type: "person"},
+	}
+	cards := []*Card{
+		{ID: "c1", Properties: map[string]any{"p1": "o-todo", "p2": "user-id-123"}},
+		{ID: "c2", Properties: map[string]any{"p2": ""}},  // empty assignee
+		{ID: "c3", Properties: map[string]any{}},          // no property at all
+	}
+
+	// Pre-populated cache so Resolve() doesn't try the API.
+	uc := &UserCache{
+		users: map[string]*User{
+			"user-id-123": {ID: "user-id-123", Username: "alice"},
+		},
+		path: "", // empty path; save() bails early when nothing dirty
+	}
+
+	got := ResolveCards(cards, defs, uc)
+	if len(got) != 3 {
+		t.Fatalf("got %d cards", len(got))
+	}
+	if got[0].Assignee != "alice" {
+		t.Errorf("c1 Assignee = %q, want %q", got[0].Assignee, "alice")
+	}
+	if got[0].Status != "Not Started" {
+		t.Errorf("c1 Status = %q, want %q", got[0].Status, "Not Started")
+	}
+	if got[1].Assignee != "" {
+		t.Errorf("c2 (empty value) Assignee = %q, want empty", got[1].Assignee)
+	}
+	if got[2].Assignee != "" {
+		t.Errorf("c3 (missing prop) Assignee = %q, want empty", got[2].Assignee)
+	}
+
+	// nil UserCache → raw user ID passes through unchanged (back-compat).
+	got2 := ResolveCards(cards, defs, nil)
+	if got2[0].Assignee != "user-id-123" {
+		t.Errorf("with nil uc, expected raw ID, got %q", got2[0].Assignee)
+	}
+}
+
+func TestResolveCards_MultiPerson(t *testing.T) {
+	defs := []PropertyDef{
+		{ID: "p_assignee", Name: "Assignee", Type: "person"},
+		{ID: "p_assignees", Name: "Assignees", Type: "multiPerson"},
+	}
+	uc := &UserCache{
+		users: map[string]*User{
+			"id-alice": {ID: "id-alice", Username: "alice"},
+			"id-bob":   {ID: "id-bob", Username: "bob"},
+			"id-carol": {ID: "id-carol", Username: "carol"},
+		},
+	}
+
+	t.Run("multi-list joined with comma", func(t *testing.T) {
+		card := &Card{ID: "c1", Properties: map[string]any{
+			"p_assignees": []any{"id-alice", "id-bob"},
+		}}
+		got := ResolveCards([]*Card{card}, defs, uc)
+		if got[0].Assignee != "alice, bob" {
+			t.Errorf("got %q, want %q", got[0].Assignee, "alice, bob")
+		}
+	})
+
+	t.Run("multi wins over empty single", func(t *testing.T) {
+		// Both Assignee and Assignees are present; Assignees has the data.
+		card := &Card{ID: "c2", Properties: map[string]any{
+			"p_assignee":  "",
+			"p_assignees": []any{"id-carol"},
+		}}
+		got := ResolveCards([]*Card{card}, defs, uc)
+		if got[0].Assignee != "carol" {
+			t.Errorf("got %q, want %q", got[0].Assignee, "carol")
+		}
+	})
+
+	t.Run("single person passes through", func(t *testing.T) {
+		card := &Card{ID: "c3", Properties: map[string]any{
+			"p_assignee": "id-alice",
+		}}
+		got := ResolveCards([]*Card{card}, defs, uc)
+		if got[0].Assignee != "alice" {
+			t.Errorf("got %q, want %q", got[0].Assignee, "alice")
+		}
+	})
+
+	t.Run("empty multiPerson array", func(t *testing.T) {
+		card := &Card{ID: "c4", Properties: map[string]any{
+			"p_assignees": []any{},
+		}}
+		got := ResolveCards([]*Card{card}, defs, uc)
+		if got[0].Assignee != "" {
+			t.Errorf("expected empty for empty array, got %q", got[0].Assignee)
+		}
+	})
+
+	t.Run("nil uc returns raw IDs joined", func(t *testing.T) {
+		card := &Card{ID: "c5", Properties: map[string]any{
+			"p_assignees": []any{"id-alice", "id-bob"},
+		}}
+		got := ResolveCards([]*Card{card}, defs, nil)
+		if got[0].Assignee != "id-alice, id-bob" {
+			t.Errorf("got %q, want raw ids", got[0].Assignee)
+		}
+	})
+}
+
+func TestAtPrefix(t *testing.T) {
+	if got := AtPrefix(""); got != "" {
+		t.Errorf("AtPrefix(\"\") = %q, want empty", got)
+	}
+	if got := AtPrefix("alice"); got != "@alice" {
+		t.Errorf("AtPrefix(\"alice\") = %q, want @alice", got)
+	}
+}
+
 func TestSortByPriority(t *testing.T) {
 	cards := []ResolvedCard{
 		{Priority: "3. Low"},

@@ -30,13 +30,23 @@ func RenderCardMarkdown(card *Card, board *Board, blocks []*Block, summaries []*
 		if !ok || val == nil {
 			continue
 		}
-		resolved := ResolvePropertyValue(defs, d.ID, val)
+		var resolved string
+		if d.Type == "person" || d.Type == "multiPerson" {
+			resolved = resolvePersonValue(val, uc)
+			// Only @-prefix when names were resolved through UserCache; raw IDs
+			// are kept as-is so callers without a cache see the unmodified value.
+			if resolved != "" && uc != nil {
+				parts := strings.Split(resolved, ", ")
+				for i, p := range parts {
+					parts[i] = "@" + p
+				}
+				resolved = strings.Join(parts, ", ")
+			}
+		} else {
+			resolved = ResolvePropertyValue(defs, d.ID, val)
+		}
 		if resolved == "" {
 			continue
-		}
-		// Resolve person properties to usernames with @ prefix
-		if (d.Type == "person" || d.Type == "multiPerson") && uc != nil {
-			resolved = "@" + uc.Resolve(resolved)
 		}
 		fmt.Fprintf(&sb, "| %s | %s |\n", d.Name, resolved)
 	}

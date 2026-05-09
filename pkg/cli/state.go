@@ -38,8 +38,10 @@ running (if any), and the In Progress tasks assigned to you on the current board
 		if err != nil {
 			return fmt.Errorf("listing cards: %w", err)
 		}
+		uc := boards.NewUserCache(svc)
+		defer uc.Flush()
 		defs := boards.ParsePropertyDefs(board)
-		resolved := boards.ResolveCards(cards, defs)
+		resolved := boards.ResolveCards(cards, defs, uc)
 		boards.SortByPriority(resolved)
 
 		var inProgress []boards.ResolvedCard
